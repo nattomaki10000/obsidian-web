@@ -119,6 +119,6 @@ A・Bは初回アクセス時に自動で読み込まれます(両方あればB�
     ├── launcher.js
     ├── sw.js
     ├── app-shim.js
-    ├── tools/prepare.py
+    ├── prepare.py
     └── README.md
 ```

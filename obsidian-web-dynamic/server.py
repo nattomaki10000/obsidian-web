@@ -2,7 +2,7 @@
 """
 obsidian-web: run an Obsidian app bundle (obsidian.asar) in a normal browser.
 
-    python3 server.py --asar /path/to/obsidian.asar --vault ./MyVault
+    python server.py --asar obsidian.asar --vault ./MyVault
 
 The Electron main process is replaced by this server:
   * static files of the app are served from an extracted copy of the asar
@@ -90,7 +90,7 @@ def prepare_app(asar, cache):
             with open(stamp_file, "w") as f:
                 f.write(stamp)
     if not os.path.exists(os.path.join(app_dir, "package.json")):
-        sys.exit("No app found. Pass --asar /path/to/obsidian.asar")
+        sys.exit("No app found. Pass --asar obsidian.asar")
     return app_dir
 
 

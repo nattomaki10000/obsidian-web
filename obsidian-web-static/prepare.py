@@ -2,9 +2,9 @@
 """
 Prepare an extracted Obsidian app directory for the static edition.
 
-  python3 tools/prepare.py obsidian.asar              # extract to ./obsidian and write ./obsidian/ow-files.json
-  python3 tools/prepare.py obsidian.asar -o myapp     # choose the output folder
-  python3 tools/prepare.py --manifest-only obsidian   # you extracted it yourself (e.g. `npx @electron/asar extract`)
+  python prepare.py obsidian.asar              # extract to ./obsidian and write ./obsidian/ow-files.json
+  python prepare.py obsidian.asar -o myapp     # choose the output folder
+  python prepare.py --manifest-only obsidian   # you extracted it yourself (e.g. `npx @electron/asar extract`)
 
 A static host cannot list a directory, so the launcher reads ow-files.json to know which files exist.
 Only the standard library is used.
