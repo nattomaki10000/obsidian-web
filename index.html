@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>obsidian-web — Obsidianを普通のブラウザで動かすラッパー</title>
+<meta name="description" content="手持ちの obsidian.asar を、Electronアプリではなく普通のブラウザで使うためのラッパー。サーバー版と静的サイト版の2種類。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700;900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f2f1f6; --surface:#ffffff; --ink:#1e1b29; --muted:#625e72; --line:#d9d6e3;
+  --accent:#6a45e8; --accent-ink:#ffffff; --accent-soft:#e8e2fd;
+  --warn-bg:#fff3e0; --warn-line:#e0a24a; --warn-ink:#5a3a05;
+  --code-bg:#1e1b29; --code-ink:#ece9f7;
+  --sans:"Zen Kaku Gothic New","Hiragino Sans","Yu Gothic",Meiryo,sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#16141d; --surface:#201d2b; --ink:#ece9f7; --muted:#a29db4; --line:#38344a;
+    --accent:#a68bff; --accent-ink:#16141d; --accent-soft:#2f2850;
+    --warn-bg:#35280f; --warn-line:#a8742a; --warn-ink:#f5d9a6;
+    --code-bg:#0f0d15; --code-ink:#ece9f7;
+  }
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:1.5rem}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:16px;line-height:1.85}
+a{color:var(--accent);text-underline-offset:3px}
+a:focus-visible,button:focus-visible,summary:focus-visible{outline:3px solid var(--accent);outline-offset:2px;border-radius:4px}
+code{font-family:var(--mono);font-size:.88em;background:var(--accent-soft);padding:.1em .4em;border-radius:4px}
+.wrap{max-width:1080px;margin:0 auto;padding:0 1.25rem;display:grid;grid-template-columns:1fr;gap:2rem}
+@media (min-width:900px){.wrap{grid-template-columns:200px minmax(0,1fr);gap:3rem}}
+
+/* side nav */
+nav.toc{font-size:.9rem;padding-top:3rem}
+@media (min-width:900px){nav.toc{position:sticky;top:0;align-self:start;height:100vh}}
+nav.toc .name{font-weight:900;font-size:1.05rem;margin:0 0 1rem}
+nav.toc ul{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:.25rem .9rem}
+@media (min-width:900px){nav.toc ul{flex-direction:column;gap:.1rem;border-left:2px solid var(--line)}}
+nav.toc a{display:block;color:var(--muted);text-decoration:none;padding:.2rem 0}
+@media (min-width:900px){nav.toc a{padding:.2rem 0 .2rem .9rem;margin-left:-2px;border-left:2px solid transparent}}
+nav.toc a:hover,nav.toc a.on{color:var(--accent);border-left-color:var(--accent)}
+
+main{padding:1rem 0 5rem;min-width:0}
+section{margin-top:4rem}
+h1{font-size:clamp(2rem,5.5vw,3.4rem);line-height:1.25;font-weight:900;margin:2.5rem 0 1rem;letter-spacing:-.01em}
+h2{font-size:1.6rem;line-height:1.4;font-weight:900;margin:0 0 1rem}
+h3{font-size:1.15rem;margin:2rem 0 .5rem}
+p{margin:.6rem 0}
+.lead{font-size:1.15rem;color:var(--muted);max-width:40em}
+.meta{display:flex;flex-wrap:wrap;gap:.6rem;margin-top:1.5rem}
+.btn{display:inline-block;padding:.55rem 1.1rem;border-radius:8px;font-weight:700;text-decoration:none;border:2px solid var(--accent)}
+.btn.main{background:var(--accent);color:var(--accent-ink)}
+.btn.sub{color:var(--accent)}
+.btn:hover{filter:brightness(1.08)}
+
+/* hero diagram */
+.flow{margin-top:2.5rem;display:grid;gap:.75rem;grid-template-columns:1fr}
+@media (min-width:700px){.flow{grid-template-columns:1fr auto 1fr auto 1fr;align-items:stretch}}
+.node{background:var(--surface);border:2px solid var(--line);border-radius:10px;padding:.9rem 1rem;font-size:.92rem;line-height:1.6}
+.node b{display:block;font-size:1rem}
+.node.core{border-color:var(--accent);background:var(--accent-soft)}
+.arrow{align-self:center;text-align:center;color:var(--muted);font-family:var(--mono)}
+
+/* tables */
+.tablewrap{overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:10px}
+table{border-collapse:collapse;width:100%;min-width:640px;font-size:.93rem;line-height:1.6}
+th,td{padding:.7rem .9rem;text-align:left;vertical-align:top;border-bottom:1px solid var(--line)}
+tr:last-child th,tr:last-child td{border-bottom:0}
+thead th{background:var(--accent-soft);font-weight:700}
+tbody th{font-weight:500;color:var(--muted);white-space:nowrap}
+
+/* chooser */
+.choose{display:grid;gap:1rem;margin-top:1.25rem}
+@media (min-width:700px){.choose{grid-template-columns:1fr 1fr}}
+.choose div{background:var(--surface);border:1px solid var(--line);border-left:5px solid var(--accent);border-radius:10px;padding:1rem 1.2rem}
+.choose p:first-child{margin-top:0;color:var(--muted)}
+.choose strong{font-size:1.05rem}
+
+/* code */
+.code{position:relative;margin:1rem 0}
+pre{margin:0;background:var(--code-bg);color:var(--code-ink);font-family:var(--mono);font-size:.88rem;line-height:1.7;padding:1rem 1.1rem;border-radius:10px;overflow-x:auto}
+.copy{position:absolute;top:.5rem;right:.5rem;font:inherit;font-size:.78rem;background:#ffffff1f;color:var(--code-ink);border:1px solid #ffffff44;border-radius:6px;padding:.2rem .6rem;cursor:pointer}
+.copy:hover{background:#ffffff38}
+
+ul.plain{padding-left:1.2rem}
+ul.plain li{margin:.3rem 0}
+
+/* notice */
+.notice{background:var(--warn-bg);border:2px solid var(--warn-line);color:var(--warn-ink);border-radius:10px;padding:1rem 1.2rem}
+.notice strong{display:block;font-size:1.05rem}
+.notice code{background:#ffffff66;color:inherit}
+
+/* asar tabs */
+.tabs{display:flex;gap:.4rem;margin:1rem 0 0;flex-wrap:wrap}
+.tabs button{font:inherit;font-weight:700;background:var(--surface);color:var(--muted);border:1px solid var(--line);border-radius:8px 8px 0 0;padding:.45rem 1rem;cursor:pointer}
+.tabs button[aria-selected="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:0 10px 10px 10px;padding:1rem 1.2rem}
+.panel[hidden]{display:none}
+.panel p:first-child{margin-top:0}
+.path{display:block;margin:.2rem 0 .8rem;word-break:break-all}
+
+details{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:.2rem 1.1rem;margin:.6rem 0}
+summary{cursor:pointer;font-weight:700;padding:.6rem 0}
+
+footer{border-top:1px solid var(--line);padding-top:1.5rem;color:var(--muted);font-size:.9rem}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<nav class="toc" aria-label="目次">
+  <p class="name">obsidian-web</p>
+  <ul>
+    <li><a href="#about">概要</a></li>
+    <li><a href="#choose">どちらを使う?</a></li>
+    <li><a href="#dynamic">サーバー版</a></li>
+    <li><a href="#static">静的サイト版</a></li>
+    <li><a href="#asar">asarの場所</a></li>
+    <li><a href="#limits">制限</a></li>
+    <li><a href="#files">フォルダ構成</a></li>
+  </ul>
+</nav>
+
+<main>
+  <header id="about">
+    <h1>Obsidianを、<br>普通のブラウザで。</h1>
+    <p class="lead">自分の <code>obsidian.asar</code>(Obsidian 1.14.4で検証)を、Electronアプリではなくブラウザで開くためのラッパーです。使い方に合わせて、サーバー版と静的サイト版の2つがあります。</p>
+    <div class="meta">
+      <a class="btn main" href="https://github.com/nattomaki10000/obsidian-web">GitHubリポジトリ</a>
+      <a class="btn sub" href="https://nattomaki10000.github.io/obsidian-web/obsidian-web-static/">静的サイト版を試す</a>
+      <a class="btn sub" href="#choose">どちらを使うか見る</a>
+    </div>
+
+    <div class="flow" aria-label="仕組みの概略">
+      <div class="node"><b>自分の obsidian.asar</b>公式アプリに入っているものを使う</div>
+      <div class="arrow" aria-hidden="true">→</div>
+      <div class="node core"><b>obsidian-web</b>Electron / Node の API をブラウザ用に置き換える</div>
+      <div class="arrow" aria-hidden="true">→</div>
+      <div class="node"><b>ブラウザ</b>Chrome・Edgeなど</div>
+    </div>
+  </header>
+
+  <section id="notice">
+    <div class="notice" role="note">
+      <strong>Obsidian本体は再配布できません</strong>
+      このリポジトリのコードにObsidian本体は含まれていません。<code>obsidian.asar</code> は、ご自身が入手したものを使ってください。公開サイトに置く場合も、本体を含めないようにしてください。
+    </div>
+  </section>
+
+  <section id="choose">
+    <h2>どちらを使う?</h2>
+    <div class="choose">
+      <div>
+        <p>PCのフォルダをそのまま開きたい</p>
+        <strong>→ 静的サイト版</strong>
+      </div>
+      <div>
+        <p>サーバーマシンのフォルダを、複数の端末から使いたい</p>
+        <strong>→ サーバー版</strong>
+      </div>
+    </div>
+
+    <h3>2つの版の違い</h3>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th></th><th>サーバー版 <code>obsidian-web-dynamic/</code></th><th>静的サイト版 <code>obsidian-web-static/</code></th></tr></thead>
+        <tbody>
+          <tr><th>必要なもの</th><td>Python 3(標準ライブラリのみ)</td><td>静的ファイルの配信だけ(HTTPS または localhost)</td></tr>
+          <tr><th>vault(ノートの場所)</th><td>サーバーを動かすマシン上のフォルダ</td><td>ブラウザで選んだPCのフォルダ(またはブラウザ内)</td></tr>
+          <tr><th>Obsidian本体</th><td>起動時に <code>--asar</code> で指定し、サーバー側で展開</td><td>ランチャーが読み込み、ブラウザ内に保存</td></tr>
+          <tr><th>対応ブラウザ</th><td>一般的なブラウザ(検証はChromium)</td><td>フォルダ選択はChrome/Edgeなどデスクトップ版のChromium系のみ</td></tr>
+          <tr><th>別のPC・スマホから</th><td>可(トークン付きURL + トンネル等)</td><td>ホスト先を開くだけ。ただしフォルダ選択はデスクトップChromiumのみ</td></tr>
+          <tr><th>外部変更の検知</th><td>約1.5秒ごとにポーリング</td><td>約4秒ごと + フォーカス復帰時</td></tr>
+          <tr><th>向いている用途</th><td>手元・自宅サーバーで安定して使う</td><td>サーバーを立てたくない、PCのフォルダをそのまま使いたい</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="dynamic">
+    <h2>サーバー版</h2>
+    <p>Electronのメインプロセス相当をPythonで置き換えます。</p>
+    <div class="code"><pre id="c1">cd obsidian-web-dynamic
+python server.py --asar obsidian.asar --vault ./MyVault</pre><button class="copy" data-target="c1">コピー</button></div>
+    <p>表示された <code>http://localhost:8765/?token=...</code> をブラウザで開きます。</p>
+    <ul class="plain">
+      <li>初回だけ asar を <code>.obsidian-web/app</code> に展開します。2回目以降は <code>--asar</code> は不要です。</li>
+      <li><code>--vault</code> のフォルダがなければ作成し、サンプルノートを入れます。</li>
+      <li>トークンは <code>.obsidian-web/token</code> に保存され、再起動後も同じURLが使えます。</li>
+      <li>オプション: <code>--port</code> <code>--host</code> <code>--cache</code> <code>--verbose</code></li>
+    </ul>
+
+    <h3>構成</h3>
+    <p><code>server.py</code>(静的配信 / 同期IPC / vault内限定のファイルAPI / 画像配信)と、<code>web/shim.js</code>(<code>require('electron')</code> や <code>fs</code>・<code>path</code> などのブラウザ代替)でできています。</p>
+
+    <h3>セキュリティ</h3>
+    <ul class="plain">
+      <li>既定では <code>127.0.0.1</code> のみで待ち受けます。Hostヘッダ検証、トークンCookie(SameSite=Strict)、独自ヘッダで、他サイトからの操作を拒否します。</li>
+      <li>ファイル操作はvault内に限定されます(シンボリックリンクでの脱出も拒否)。</li>
+    </ul>
+    <div class="notice" role="note">
+      <strong>外部に公開するとき</strong>
+      <code>0.0.0.0</code> で公開する場合は、必ずSSHトンネルか、HTTPS付きのリバースプロキシ越しにしてください。
+    </div>
+  </section>
+
+  <section id="static">
+    <h2>静的サイト版</h2>
+    <p>サーバーなしで、ファイルを置くだけで動きます。本体の読み込みはService Workerとブラウザ内展開、ファイル操作はFile System Access APIで行います。</p>
+    <p><a href="https://nattomaki10000.github.io/obsidian-web/obsidian-web-static/">https://nattomaki10000.github.io/obsidian-web/obsidian-web-static/</a> で、インストールせずに試せます。</p>
+    <div class="code"><pre id="c2">cd obsidian-web-static
+python -m http.server 8800      # → http://localhost:8800/</pre><button class="copy" data-target="c2">コピー</button></div>
+    <p>ランチャー(<code>index.html</code>)で、①本体を読み込む → ②フォルダを選ぶ → ③開く、の順に進めます。</p>
+
+    <h3>Obsidian本体の渡し方</h3>
+    <p>アップロード不要にもできます。</p>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>方法</th><th>やること</th></tr></thead>
+        <tbody>
+          <tr><th>A</th><td><code>obsidian.asar</code> を <code>obsidian-web-static/</code> に置く</td></tr>
+          <tr><th>B</th><td><code>python prepare.py obsidian.asar</code> で <code>obsidian/</code> と一覧 <code>ow-files.json</code> を作る</td></tr>
+          <tr><th>C</th><td>何も置かず、ランチャーの「asarファイルを手動で選ぶ」から指定する</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>AとBは初回アクセス時に自動で読み込まれます(両方あればB優先)。差し替えたあとは「このサイトから読み込み直す」を押してください。</p>
+
+    <h3>構成と対応ブラウザ</h3>
+    <p><code>index.html</code> / <code>launcher.js</code>(ランチャー)、<code>sw.js</code>(Service Worker)、<code>app-shim.js</code>(Electron/Node APIの代替)、<code>prepare.py</code>(任意)。</p>
+    <p>フォルダ選択はChrome/Edgeなどのデスクトップ版のみ対応です。Firefox/Safariでは「ブラウザ内お試しvault」だけが使えます(Safariは動かないことがあります)。</p>
+  </section>
+
+  <section id="asar">
+    <h2>obsidian.asar の場所</h2>
+    <p>お使いのOSに合わせて、次のパスから <code>obsidian.asar</code>(または <code>obsidian-1.xx.x.asar</code>)を取得してください。<code>[ユーザー名]</code> は自分のアカウント名に置き換えます。環境によって場所が違うことがあるので、見つからない場合は探してみてください。</p>
+
+    <div class="tabs" role="tablist" aria-label="OS">
+      <button role="tab" id="t-win" aria-selected="true" aria-controls="p-win">Windows</button>
+      <button role="tab" id="t-mac" aria-selected="false" aria-controls="p-mac" tabindex="-1">Mac</button>
+      <button role="tab" id="t-lin" aria-selected="false" aria-controls="p-lin" tabindex="-1">Linux</button>
+    </div>
+
+    <div class="panel" id="p-win" role="tabpanel" aria-labelledby="t-win">
+      <p><strong>自動アップデート版(推奨・最新データ)</strong></p>
+      <code class="path">C:\Users\[ユーザー名]\AppData\Roaming\obsidian\</code>
+      <p><strong>通常のインストール先</strong></p>
+      <code class="path">C:\Users\[ユーザー名]\AppData\Local\Obsidian\resources\obsidian.asar</code>
+      <p>近道: <code>Win + R</code> を押し、<code>%APPDATA%\obsidian</code> を貼り付けてEnterを押すと、フォルダが直接開きます。</p>
+    </div>
+    <div class="panel" id="p-mac" role="tabpanel" aria-labelledby="t-mac" hidden>
+      <p><strong>自動アップデート版(推奨・最新データ)</strong></p>
+      <code class="path">/Users/[ユーザー名]/Library/Application Support/obsidian/</code>
+      <p><strong>アプリ本体の中</strong></p>
+      <code class="path">/Applications/Obsidian.app/Contents/Resources/obsidian.asar</code>
+      <p>近道: Finderで <code>Cmd + Shift + G</code> を押し、<code>~/Library/Application Support/obsidian</code> を貼り付けてEnterを押すと移動できます。</p>
+    </div>
+    <div class="panel" id="p-lin" role="tabpanel" aria-labelledby="t-lin" hidden>
+      <p><strong>自動アップデート版</strong></p>
+      <code class="path">/home/[ユーザー名]/.config/obsidian/</code>
+    </div>
+  </section>
+
+  <section id="limits">
+    <h2>共通の制限</h2>
+    <ul class="plain">
+      <li>vaultは、1サーバー(静的版は1ブラウザプロファイル)につき1つです。切り替えUIは動きません。</li>
+      <li>「既定のアプリで開く」「エクスプローラーで表示」、Webビューア、スクリーンショット系の機能は動きません。</li>
+      <li>ごみ箱は <code>&lt;vault&gt;/.trash</code> になります。</li>
+      <li><code>app.js</code> は配信時に1箇所だけ置換します(設定画面などを別ウィンドウにしないため)。元のasarは変更しません。</li>
+      <li>コミュニティプラグインやテーマの取得は、サーバー版ではサーバー経由、静的版ではブラウザのCORS制限を受けます。</li>
+    </ul>
+  </section>
+
+  <section id="files">
+    <h2>フォルダ構成</h2>
+    <div class="code"><pre>.
+├── README.md
+├── obsidian-web-dynamic/    サーバー版
+│   ├── server.py
+│   ├── web/shim.js
+│   └── README.md
+└── obsidian-web-static/     静的サイト版
+    ├── index.html
+    ├── launcher.js
+    ├── sw.js
+    ├── app-shim.js
+    ├── prepare.py
+    └── README.md</pre></div>
+  </section>
+
+  <footer>
+    <p><a href="https://github.com/nattomaki10000/obsidian-web">github.com/nattomaki10000/obsidian-web</a></p>
+    <p>Obsidianは、その開発元の商標・著作物です。このプロジェクトは公式のものではありません。</p>
+  </footer>
+</main>
+</div>
+
+<script>
+// コードのコピー
+document.querySelectorAll('.copy').forEach(function(b){
+  b.addEventListener('click', function(){
+    var t = document.getElementById(b.dataset.target).textContent;
+    var done = function(){ b.textContent = 'コピーしました'; setTimeout(function(){ b.textContent = 'コピー'; }, 1500); };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(t).then(done, function(){ b.textContent = '失敗'; });
+    } else { b.textContent = '手動で選択してください'; }
+  });
+});
+
+// OSタブ
+(function(){
+  var tabs = Array.prototype.slice.call(document.querySelectorAll('[role="tab"]'));
+  function select(tab){
+    tabs.forEach(function(t){
+      var on = t === tab;
+      t.setAttribute('aria-selected', on);
+      t.tabIndex = on ? 0 : -1;
+      document.getElementById(t.getAttribute('aria-controls')).hidden = !on;
+    });
+  }
+  tabs.forEach(function(t, i){
+    t.addEventListener('click', function(){ select(t); });
+    t.addEventListener('keydown', function(e){
+      var n = e.key === 'ArrowRight' ? i + 1 : e.key === 'ArrowLeft' ? i - 1 : null;
+      if (n === null) return;
+      n = (n + tabs.length) % tabs.length;
+      tabs[n].focus(); select(tabs[n]);
+    });
+  });
+  // OS自動選択
+  var p = navigator.platform || '';
+  if (/Mac/i.test(p)) select(tabs[1]);
+  else if (/Linux/i.test(p) && !/Android/i.test(navigator.userAgent)) select(tabs[2]);
+})();
+
+// 目次のハイライト
+(function(){
+  var links = Array.prototype.slice.call(document.querySelectorAll('nav.toc a'));
+  if (!('IntersectionObserver' in window)) return;
+  var map = {};
+  links.forEach(function(a){ map[a.getAttribute('href').slice(1)] = a; });
+  var io = new IntersectionObserver(function(es){
+    es.forEach(function(e){
+      if (e.isIntersecting && map[e.target.id]) {
+        links.forEach(function(a){ a.classList.remove('on'); });
+        map[e.target.id].classList.add('on');
+      }
+    });
+  }, { rootMargin: '-20% 0px -70% 0px' });
+  Object.keys(map).forEach(function(id){ var el = document.getElementById(id); if (el) io.observe(el); });
+})();
+</script>
+</body>
+</html>
