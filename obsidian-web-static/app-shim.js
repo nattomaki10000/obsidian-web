@@ -250,6 +250,53 @@
     window.Worker = PatchedWorker;
   })();
 
+  // ------------------------------------------------------------------ fetch / XHR paths
+  // Obsidian loads resources such as "/i18n/ja.txt" and "/i18n/mapping.txt" with root-absolute URLs.
+  // On a static site (e.g. GitHub Pages under /<repo>/<dir>/) the app lives in <root>/app/, so these
+  // would hit the host's real root and 404 (the UI language then never changes). Redirect same-origin
+  // requests that are not already under <root>/app/ or <root>/__vault/ into <root>/app/ (this also
+  // covers hosting at the domain root, e.g. http://localhost:8800/, where "/i18n/ja.txt" is "inside" the site).
+  (function patchFetchAndXhr() {
+    const APP = new URL('app/', BASE);
+    function fixUrl(input) {
+      try {
+        const u = new URL(String(input), location.href);
+        if (u.origin !== location.origin || !/^https?:$/.test(u.protocol)) return null; // external, blob:, data: ...
+        // path relative to the site root; a root-absolute path outside the site is treated the same way
+        const rel = u.pathname.startsWith(BASE.pathname) ? u.pathname.slice(BASE.pathname.length) : u.pathname.slice(1);
+        // already inside the app / the vault resources (or the site root itself): leave as is
+        if (!rel || rel.startsWith('app/') || rel.startsWith('__vault/')) return null;
+        return new URL(rel + u.search + u.hash, APP).href;
+      } catch (_) { return null; }
+    }
+    const nativeFetch = window.fetch;
+    if (nativeFetch && !nativeFetch.__owPatched) {
+      const patchedFetch = function (input, init) {
+        if (typeof input === 'string' || input instanceof URL) {
+          const f = fixUrl(input);
+          if (f) input = f;
+        } else if (typeof Request !== 'undefined' && input instanceof Request) {
+          const f = fixUrl(input.url);
+          if (f) input = new Request(f, input);
+        }
+        return nativeFetch.call(this, input, init);
+      };
+      patchedFetch.__owPatched = true;
+      window.fetch = patchedFetch;
+    }
+    const nativeOpen = XMLHttpRequest.prototype.open;
+    if (!nativeOpen.__owPatched) {
+      const patchedOpen = function (method, url) {
+        const f = fixUrl(url);
+        const args = Array.prototype.slice.call(arguments);
+        if (f) args[1] = f;
+        return nativeOpen.apply(this, args);
+      };
+      patchedOpen.__owPatched = true;
+      XMLHttpRequest.prototype.open = patchedOpen;
+    }
+  })();
+
   function idbOpen() {
     return new Promise((res, rej) => {
       const r = indexedDB.open('obsidian-web', 1);
