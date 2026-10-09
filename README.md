@@ -89,6 +89,8 @@ A・Bは初回アクセス時に自動で読み込まれます(両方あればB�
   `C:\Users\[ユーザー名]\AppData\Roaming\obsidian\`
 * **通常のインストール先**
   `C:\Users\[ユーザー名]\AppData\Local\Obsidian\resources\obsidian.asar`
+* **こちらかもしれません**
+  `C:\Users\[ユーザー名]\AppData\Local\Programs\Obsidian\resources\obsidian.asar`
 
 > 💡 **Windowsでの一発移動の裏技:**
 > `Win + R` キーを同時に押し、ファイル名を指定して実行画面に `%APPDATA%\obsidian` と貼り付けて Enter を押すと、対象のフォルダが直接開きます。
