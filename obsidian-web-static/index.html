@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>obsidian-web ランチャー</title>
+<style>
+  :root { color-scheme: light dark; --bg:#f6f6f7; --card:#fff; --fg:#222; --sub:#6b6b73; --line:#dcdce0; --acc:#7c3aed; --ok:#15803d; --err:#b91c1c; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#1c1c20; --card:#26262c; --fg:#e8e8ec; --sub:#a0a0aa; --line:#3a3a42; --acc:#a78bfa; --ok:#4ade80; --err:#f87171; } }
+  body { margin:0; background:var(--bg); color:var(--fg); font:15px/1.6 system-ui,-apple-system,"Hiragino Sans","Yu Gothic UI",sans-serif; }
+  main { max-width:640px; margin:0 auto; padding:32px 16px 64px; }
+  h1 { font-size:22px; margin:0 0 4px; }
+  .lead { color:var(--sub); margin:0 0 24px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:16px 18px; margin-bottom:14px; }
+  .card h2 { font-size:15px; margin:0 0 6px; display:flex; align-items:center; gap:8px; }
+  .num { display:inline-grid; place-items:center; width:22px; height:22px; border-radius:50%; background:var(--acc); color:#fff; font-size:12px; }
+  .state { color:var(--sub); font-size:13px; margin:4px 0 10px; }
+  .state.ok { color:var(--ok); } .state.err { color:var(--err); }
+  button, .btn { font:inherit; padding:8px 14px; border-radius:8px; border:1px solid var(--line); background:var(--card); color:var(--fg); cursor:pointer; }
+  button:hover:not(:disabled), .btn:hover { border-color:var(--acc); }
+  button.primary { background:var(--acc); border-color:var(--acc); color:#fff; font-weight:600; padding:10px 20px; }
+  button:disabled { opacity:.45; cursor:not-allowed; }
+  .row { display:flex; flex-wrap:wrap; gap:8px; }
+  input[type=file] { display:none; }
+  #msg { white-space:pre-wrap; font-size:13px; min-height:1.5em; margin-top:10px; }
+  #bar { height:6px; background:var(--line); border-radius:3px; overflow:hidden; margin-top:8px; display:none; }
+  #bar i { display:block; height:100%; width:0; background:var(--acc); transition:width .1s; }
+  small, .note { color:var(--sub); font-size:12.5px; }
+  .warn { border-color:var(--err); }
+</style>
+</head>
+<body>
+<main>
+  <h1>obsidian-web</h1>
+  <p class="lead"><code>obsidian.asar</code>(サイトに置くか、手動で選択)とPC上のフォルダだけで、ブラウザでObsidianを使えます。サーバーは不要です。</p>
+
+  <div id="unsupported" class="card warn" hidden>
+    <b>このブラウザではフォルダを直接開けません。</b>
+    <div class="note">PCのフォルダを使うにはChrome / Edgeなど(File System Access API対応)が必要です。下の「ブラウザ内お試しvault」なら他のブラウザでも試せます(ただしSafariは非対応のことがあります)。</div>
+  </div>
+
+  <section class="card">
+    <h2><span class="num">1</span> Obsidian本体を読み込む <small>(最初の1回だけ)</small></h2>
+    <div id="asarState" class="state">確認中…</div>
+    <div class="row">
+      <button id="reload" hidden>このサイトから読み込み直す</button>
+      <label class="btn" for="asarFile">asarファイルを手動で選ぶ</label>
+      <input id="asarFile" type="file" accept=".asar">
+    </div>
+    <div id="bar"><i></i></div>
+    <div class="note" style="margin-top:8px">このページと同じ場所に <code>obsidian.asar</code>(または解凍した <code>obsidian/</code> フォルダ)があれば自動で読み込みます。無い場合は手動で選んでください。読み込んだ内容はこのブラウザにだけ保存され、外部へは送信されません。</div>
+  </section>
+
+  <section class="card">
+    <h2><span class="num">2</span> vault(ノートのフォルダ)を選ぶ</h2>
+    <div id="vaultState" class="state">未選択</div>
+    <div class="row">
+      <button id="pickFolder">フォルダを選ぶ…</button>
+      <button id="useOpfs">ブラウザ内お試しvault</button>
+    </div>
+    <div class="note" style="margin-top:8px">空のフォルダを選ぶとObsidianのサンプルノートが作られます。デスクトップ・書類・ダウンロードなどの<b>フォルダそのもの</b>はブラウザの制限で選べないため、その中のサブフォルダを選んでください。お試しvaultはブラウザ内部に保存され、ブラウザのデータ削除で消えます。</div>
+  </section>
+
+  <section class="card">
+    <h2><span class="num">3</span> 開く</h2>
+    <button id="open" class="primary" disabled>Obsidianを開く</button>
+    <div id="msg"></div>
+  </section>
+
+  <p class="note">対応: Chrome / Edge 等のChromium系(デスクトップ)。HTTPSまたは localhost で配信してください。</p>
+</main>
+<script src="launcher.js"></script>
+</body>
+</html>
