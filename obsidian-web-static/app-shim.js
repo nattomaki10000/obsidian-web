@@ -217,6 +217,36 @@
   const BASE = new URL('../', location.href); // site root; the app itself lives in <root>/app/
   const RES_PREFIX = new URL('__vault/', BASE).pathname;
 
+  // ------------------------------------------------------------------ Web Worker paths
+  // Obsidian starts the graph view's physics worker with an absolute path: new Worker("/sim.js").
+  // On a static site the app lives in <root>/app/, so "/sim.js" would point outside of it (404)
+  // and the graph nodes would never move. Redirect root-absolute worker scripts into <root>/app/.
+  (function patchWorker() {
+    const NativeWorker = window.Worker;
+    if (!NativeWorker || NativeWorker.__owPatched) return;
+    const APP = new URL('app/', BASE);
+    function fix(url) {
+      if (typeof url === 'string' || url instanceof URL) {
+        const s = String(url);
+        if (/^\/(?!\/)/.test(s) && !s.startsWith(BASE.pathname + 'app/')) return new URL(s.slice(1), APP).href;
+        if (/^[a-z][a-z0-9+.-]*:/i.test(s) || s.startsWith('//')) {
+          try {
+            const u = new URL(s, location.href);
+            if (u.origin === location.origin && !u.pathname.startsWith(BASE.pathname)) return new URL(u.pathname.slice(1) + u.search, APP).href;
+          } catch (_) { /* leave as is */ }
+        }
+      }
+      return url;
+    }
+    function PatchedWorker(url, opts) {
+      if (!new.target) throw new TypeError("Failed to construct 'Worker': Please use the 'new' operator");
+      return new NativeWorker(fix(url), opts);
+    }
+    PatchedWorker.prototype = NativeWorker.prototype;
+    PatchedWorker.__owPatched = true;
+    window.Worker = PatchedWorker;
+  })();
+
   function idbOpen() {
     return new Promise((res, rej) => {
       const r = indexedDB.open('obsidian-web', 1);
