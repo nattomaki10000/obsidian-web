@@ -226,15 +226,18 @@
     if (!NativeWorker || NativeWorker.__owPatched) return;
     const APP = new URL('app/', BASE);
     function fix(url) {
-      if (typeof url === 'string' || url instanceof URL) {
-        const s = String(url);
-        if (/^\/(?!\/)/.test(s) && !s.startsWith(BASE.pathname + 'app/')) return new URL(s.slice(1), APP).href;
-        if (/^[a-z][a-z0-9+.-]*:/i.test(s) || s.startsWith('//')) {
-          try {
-            const u = new URL(s, location.href);
-            if (u.origin === location.origin && !u.pathname.startsWith(BASE.pathname)) return new URL(u.pathname.slice(1) + u.search, APP).href;
-          } catch (_) { /* leave as is */ }
-        }
+      if (typeof url !== 'string' && !(url instanceof URL)) return url;
+      const s = String(url);
+      // root-absolute path such as "/sim.js" (not "//host/...")
+      if (/^\/(?!\/)/.test(s)) {
+        return s.startsWith(BASE.pathname + 'app/') ? url : new URL(s.slice(1), APP).href;
+      }
+      // blob:, data: and everything else are left untouched; only same-origin http(s) URLs outside the site are redirected
+      if (/^https?:\/\//i.test(s)) {
+        try {
+          const u = new URL(s);
+          if (u.origin === location.origin && !u.pathname.startsWith(BASE.pathname)) return new URL(u.pathname.slice(1) + u.search, APP).href;
+        } catch (_) { /* leave as is */ }
       }
       return url;
     }
