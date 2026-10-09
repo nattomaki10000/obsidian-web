@@ -112,7 +112,7 @@ A・Bは初回アクセス時に自動で読み込まれます(両方あればB�
 ```
 .
 ├── README.md                  ← このファイル
-├── obsidian-web/              サーバー版
+├── obsidian-web-dynamic/      サーバー版
 │   ├── server.py
 │   ├── web/shim.js
 │   └── README.md
