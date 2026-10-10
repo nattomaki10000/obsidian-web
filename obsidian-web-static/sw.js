@@ -1,5 +1,5 @@
 /* obsidian-web (static edition) service worker
- *   <scope>app/...      -> Obsidian files that the launcher extracted from the user's obsidian.asar (Cache Storage)
+ *   <scope>app/...      -> Obsidian files that the launcher extracted from the user's obsidian.asar or mobile public.zip (Cache Storage)
  *   <scope>__vault/...  -> files of the vault; the open Obsidian page reads them via the File System Access API
  */
 const APP_CACHE = 'ow-app';
@@ -19,6 +19,9 @@ self.addEventListener('fetch', e => {
 async function serveApp(u, rel) {
   if (rel === 'app/shim.js') { // the shim is a normal static file of this site
     return fetch(new URL('app-shim.js', SCOPE), { cache: 'no-cache' });
+  }
+  if (rel === 'app/mobile-shim.js') { // Capacitor emulation for the mobile (APK/IPA) build
+    return fetch(new URL('mobile-shim.js', SCOPE), { cache: 'no-cache' });
   }
   const cache = await caches.open(APP_CACHE);
   let r = await cache.match(u.origin + u.pathname);

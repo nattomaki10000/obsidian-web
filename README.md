@@ -1,6 +1,7 @@
 # obsidian-web
 
 自分の `obsidian.asar`(Obsidian 1.14.4で検証)を、Electronアプリではなく**普通のブラウザで**使うためのラッパーです。
+どちらの版も、スマホ版の **APK / IPA から取り出した `public` フォルダ(zip)** に対応しています。アクセスした端末で、PCにはasar、スマホにはモバイル版を出し分けます(詳しくは各フォルダのREADME)。
 用途に応じて2つの版があります。
 
 | | **サーバー版** `obsidian-web-dynamic/` | **静的サイト版** `obsidian-web-static/` |

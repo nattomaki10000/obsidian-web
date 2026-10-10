@@ -25,6 +25,7 @@
   #msg { white-space:pre-wrap; font-size:13px; min-height:1.5em; margin-top:10px; }
   #bar { height:6px; background:var(--line); border-radius:3px; overflow:hidden; margin-top:8px; display:none; }
   #bar i { display:block; height:100%; width:0; background:var(--acc); transition:width .1s; }
+  select { font:inherit; padding:6px 8px; border-radius:8px; border:1px solid var(--line); background:var(--card); color:var(--fg); }
   small, .note { color:var(--sub); font-size:12.5px; }
   .warn { border-color:var(--err); }
 </style>
@@ -44,11 +45,19 @@
     <div id="asarState" class="state">確認中…</div>
     <div class="row">
       <button id="reload" hidden>このサイトから読み込み直す</button>
-      <label class="btn" for="asarFile">asarファイルを手動で選ぶ</label>
-      <input id="asarFile" type="file" accept=".asar">
+      <label class="btn" for="asarFile">asar / モバイル版zipを手動で選ぶ</label>
+      <input id="asarFile" type="file" accept=".asar,.zip,application/zip">
+    </div>
+    <div class="row" style="margin-top:10px;align-items:center">
+      <label class="note" for="platform">モバイル版zipを読み込んだ場合の動作:</label>
+      <select id="platform">
+        <option value="auto">自動(開いている端末から判定)</option>
+        <option value="ios">iOS版として動かす</option>
+        <option value="android">Android版として動かす</option>
+      </select>
     </div>
     <div id="bar"><i></i></div>
-    <div class="note" style="margin-top:8px">このページと同じ場所に <code>obsidian.asar</code>(または解凍した <code>obsidian/</code> フォルダ)があれば自動で読み込みます。無い場合は手動で選んでください。読み込んだ内容はこのブラウザにだけ保存され、外部へは送信されません。</div>
+    <div class="note" style="margin-top:8px">このページと同じ場所に <code>obsidian.asar</code>(または解凍した <code>obsidian/</code> フォルダ)があれば自動で読み込みます。無い場合は手動で選んでください。スマホ版の <b>APK / IPA から取り出した <code>public</code> フォルダのzip</b> も選べます(その場合は下の「vault」はvaultが並ぶ親フォルダとして使われます)。読み込んだ内容はこのブラウザにだけ保存され、外部へは送信されません。</div>
   </section>
 
   <section class="card">

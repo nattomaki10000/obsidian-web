@@ -9,30 +9,45 @@ Obsidian本体(`obsidian.asar`)を読み込ませ、PC上のフォルダをvault
 | `index.html` / `launcher.js` | ランチャー(本体の読み込み・フォルダ選択・起動) |
 | `sw.js` | Service Worker(展開済みアプリの配信、vault内の画像などの配信) |
 | `app-shim.js` | Electron/Node API(`require`, `fs`, `path` …)のブラウザ代替 |
-| `prepare.py` | (任意)asarを解凍し、ファイル一覧 `ow-files.json` を作る |
+| `mobile-shim.js` | モバイル版(APK/IPA)用: Capacitorプラグイン(Filesystem など)のブラウザ代替 |
+| `prepare.py` | (任意・フォルダ配置用)asar / モバイルzipを解凍し、ファイル一覧 `ow-files.json` を作る |
 
-## Obsidian本体の渡し方(3通り)
-アップロード操作は不要にできます。ランチャーは次の順に自動検出します。
+## Obsidian本体の渡し方(端末ごとに自動で出し分け)
+ランチャーは、開いた端末に合わせて**PC → デスクトップ版、スマホ/タブレット → モバイル版**を自動で読み込みます(アップロード操作は不要)。ファイル名は次のとおりに決まっています。
 
-**A. `obsidian.asar` をこのフォルダに置く(いちばん簡単)**
-```
-obsidian-web-static/
-├── index.html ...
-└── obsidian.asar      ← ここに置く
-```
-**B. 解凍済みの `obsidian/` フォルダを置く**(約28MBのasarを配信したくない場合)
+| 端末 | ① フォルダ(**推奨**) | ② 単一ファイル(手軽) |
+|---|---|---|
+| PC | `obsidian/` | `obsidian.asar` |
+| スマホ・タブレット | `obsidian-mobile/` | `obsidian-mobile.zip` |
+
+- 同じ端末向けに①と②の両方がある場合は①を使います。
+- 片方の種類しか置いていない場合は、どの端末でもそれを使います(例: zipだけ置くとPCにもモバイル版が出ます)。
+- URLに `?ui=mobile` / `?ui=desktop` を付けると、端末に関係なくその種類を読み込み直します。
+- `obsidian-mobile.zip` は**APK(Android)とIPA(iOS)のどちらから取り出した `public` フォルダでも**使えます(ランチャーが開いた端末に合わせてAndroid動作/iOS動作を切り替えます)。両方持っている場合は新しい版のほうがおすすめです。zipの中の親フォルダ(`public/` など)はあってもなくてもOKです。
+
+### なぜフォルダ(①)を推奨するか
+- 配信が軽い: GitHub Pages などはテキスト(js/css/txt)をgzip圧縮して配信しますが、zipやasarは1つの大きなファイル(約25〜30MB)のまま転送されます。フォルダなら更新が必要なファイルだけ取得できます。
+- ブラウザ側の展開処理が要りません(zipの解凍が不要)。
+- 一方、フォルダは `prepare.py` で一度ファイル一覧(`ow-files.json`)を作る手間が要ります(静的ホストはフォルダの中身を列挙できないため)。**手軽に試すだけなら②でも十分です。**
+
 ```bash
 cd obsidian-web-static
 python prepare.py obsidian.asar     # → ./obsidian/ と ./obsidian/ow-files.json を作成
-# 自分で解凍した場合: python prepare.py --manifest-only ./obsidian
+python prepare.py public.zip        # → ./obsidian-mobile/ と ./obsidian-mobile/ow-files.json を作成(モバイル版)
+# 自分で解凍した場合: python prepare.py --manifest-only ./obsidian   (または ./obsidian-mobile)
 ```
-静的ホストはフォルダの中身を列挙できないため、`ow-files.json`(ファイル一覧)が必要です。
-A・Bの両方がある場合はBを使います。
+```
+obsidian-web-static/
+├── index.html ...
+├── obsidian/ または obsidian.asar              ← PC用
+└── obsidian-mobile/ または obsidian-mobile.zip  ← スマホ用
+```
 
-**C. 手動で選ぶ**: 置いていない場合は、ランチャーの「asarファイルを手動で選ぶ」から指定します。
+**手動で選ぶ**: 置いていない場合は、ランチャーの「asar / モバイル版zipを手動で選ぶ」から指定します。
 
 初回アクセス時に自動で読み込み、そのブラウザのCache Storageに保存します。2回目以降は再取得しません。
-asarを新しいバージョンに差し替えたら、ランチャーの「このサイトから読み込み直す」を押してください。
+差し替えたら、ランチャーの「このサイトから読み込み直す」を押してください。
+(ブラウザの開発者ツールに、存在しない候補ファイルを探す `404` が少し出ますが、検出のための確認で、問題ありません。)
 
 ## 使い方
 1. このフォルダを配信する(HTTPSまたは `localhost` が必須。`file://` では動きません)
@@ -45,6 +60,17 @@ asarを新しいバージョンに差し替えたら、ランチャーの「こ�
 4. ③「開く」
 
 2回目以降は「開く」だけです(ブラウザを閉じた後はフォルダへのアクセス許可を求められます)。
+
+## モバイル版(APK / IPA の `public` フォルダ)について
+スマホ版Obsidianの `public` フォルダ(Androidは APK の `assets/public`、iOSは IPA の `Payload/Obsidian.app/public`)を、上の `obsidian-mobile/` または `obsidian-mobile.zip` として置くか、ランチャーで手動で選びます。
+
+- モバイル版はElectronではなくCapacitorで動くため、`mobile-shim.js` がネイティブ側のプラグイン(ファイル操作・端末情報・クリップボード等)をブラウザ上で代わりに実装します。`app.js` は書き換えません。
+- ランチャーの「モバイル版zipを読み込んだ場合の動作」で **iOS版 / Android版** を選べます(「自動」は開いている端末で判定: Androidのブラウザ→Android動作、それ以外→iOS動作。ファイル名は見ません。Android/iOSでvault作成画面などの挙動が少し違います)。
+- ②で選ぶ場所は **vaultが並ぶ親フォルダ** として使われます(「ブラウザ内お試しvault」ならブラウザ内ストレージ)。vaultの作成・選択はObsidian側の画面で行います。
+  - iOS動作: 「Create a vault」でその場所の中にvaultが作られます。
+  - Android動作: 「App storage」ならその場所の中に作成。「Device storage」/「Open folder as vault」を選ぶとブラウザのフォルダ選択ダイアログが開きます(Chrome / Edge等のみ)。次回以降は「開く」を押した時にアクセス許可を求められます。
+- 制限: ゴミ箱は `<vault>/.trash`、外部変更の自動検知・iCloud・スクリーンショット・ハプティクス・クイックアクション等は動きません。デスクトップ版とモバイル版は同時に読み込めず、後から読み込んだ方に置き換わります。
+- 確認環境: Android版(Obsidian 1.14.4)・iOS版(1.13.6)の `public` で、vault作成 → ノート作成・リネーム・削除・6MBの添付ファイル読み書き → ページ再読み込み後の復元まで、Chromiumで確認しています(日本語UIも表示されます)。
 
 ## 公開時の注意(重要)
 **Obsidian本体は再配布できません。**

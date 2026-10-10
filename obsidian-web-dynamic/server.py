@@ -3,6 +3,7 @@
 obsidian-web: run an Obsidian app bundle (obsidian.asar) in a normal browser.
 
     python server.py --asar obsidian.asar --vault ./MyVault
+    python server.py --asar obsidian.asar --mobile-zip public.zip --vault ./MyVault   # phones get the mobile build
 
 The Electron main process is replaced by this server:
   * static files of the app are served from an extracted copy of the asar
@@ -28,6 +29,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+import zipfile
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
@@ -74,7 +76,7 @@ def extract_asar(src, dst):
         walk(header, dst)
 
 
-def prepare_app(asar, cache):
+def prepare_app(asar, cache, required=True):
     app_dir = os.path.join(cache, "app")
     stamp_file = os.path.join(cache, "asar.stamp")
     if asar:
@@ -90,8 +92,107 @@ def prepare_app(asar, cache):
             with open(stamp_file, "w") as f:
                 f.write(stamp)
     if not os.path.exists(os.path.join(app_dir, "package.json")):
-        sys.exit("No app found. Pass --asar obsidian.asar")
+        if required:
+            sys.exit("No app found. Pass --asar obsidian.asar (or --mobile-zip public.zip)")
+        return None
     return app_dir
+
+
+# --------------------------------------------------------------------------
+# mobile build (the "public" folder of the Android APK / iOS IPA, as a zip)
+# --------------------------------------------------------------------------
+def zip_prefix(names):
+    """Folder inside the zip that holds index.html (the shortest one), or None."""
+    best = None
+    for n in names:
+        if n == "index.html" or n.endswith("/index.html"):
+            pre = n[:-len("index.html")]
+            if best is None or len(pre) < len(best):
+                best = pre
+    return best
+
+
+def looks_like_mobile_zip(path):
+    """True for a zip that holds index.html + app.js + cordova.js (and no package.json)."""
+    try:
+        with zipfile.ZipFile(path) as z:
+            names = [n.replace("\\", "/") for n in z.namelist()]
+    except (zipfile.BadZipFile, OSError):
+        return False
+    pre = zip_prefix(names)
+    if pre is None:
+        return False
+    have = {n[len(pre):] for n in names if n.startswith(pre)}
+    return {"index.html", "app.js", "cordova.js"} <= have and "package.json" not in have
+
+
+def extract_mobile_zip(src, dst):
+    with zipfile.ZipFile(src) as z:
+        infos = [i for i in z.infolist() if not i.filename.endswith("/")]
+        pre = zip_prefix([i.filename.replace("\\", "/") for i in infos]) or ""
+        dst_real = os.path.realpath(dst)
+        os.makedirs(dst, exist_ok=True)
+        for i in infos:
+            name = i.filename.replace("\\", "/")
+            if not name.startswith(pre) or name.startswith("__MACOSX/") or name.endswith(".DS_Store"):
+                continue
+            p = os.path.join(dst, *name[len(pre):].split("/"))
+            if os.path.commonpath([dst_real, os.path.realpath(p)]) != dst_real:
+                continue  # path traversal guard
+            os.makedirs(os.path.dirname(p), exist_ok=True)
+            with z.open(i) as r, open(p, "wb") as o:
+                shutil.copyfileobj(r, o)
+
+
+def mobile_info(app_dir):
+    with open(os.path.join(app_dir, "app.js"), encoding="utf-8", errors="replace") as f:
+        js = f.read()
+    t = re.search(r'"(I understand and agree[^"]*)"', js)
+    v = re.search(r'\b\w+="(1\.\d+\.\d+)",\w+="\d+\.\d+\.\d+"', js)
+    return (v.group(1) if v else "1.14.4"), (t.group(1) if t else "")
+
+
+def prepare_mobile(zips, cache):
+    """Extract every mobile zip once (cached by size+mtime). Returns [{key, dir, name, hint, version, terms}]."""
+    out = []
+    for idx, zp in enumerate(zips):
+        st = os.stat(zp)
+        stamp = "%s:%d:%d" % (os.path.abspath(zp), st.st_size, int(st.st_mtime))
+        d = os.path.join(cache, "mobile", str(idx))
+        sf = os.path.join(d + ".stamp")
+        old = open(sf).read() if os.path.exists(sf) else ""
+        if old != stamp or not os.path.exists(os.path.join(d, "index.html")):
+            print("Extracting %s ..." % zp)
+            if os.path.isdir(d):
+                shutil.rmtree(d)
+            os.makedirs(os.path.dirname(d), exist_ok=True)
+            extract_mobile_zip(zp, d)
+            with open(sf, "w") as f:
+                f.write(stamp)
+        version, terms = mobile_info(d)
+        base = os.path.basename(zp).lower()
+        hint = "android" if re.search(r"android|apk", base) else ("ios" if re.search(r"ios|ipa|iphone|ipad", base) else None)
+        out.append({"key": str(idx), "dir": d, "name": os.path.basename(zp), "hint": hint, "version": version, "terms": terms})
+    return out
+
+
+def is_mobile_ua(ua):
+    return bool(re.search(r"Android|iPhone|iPod|iPad|Mobile", ua or "", re.I))
+
+
+def ua_platform(ua):
+    return "android" if re.search(r"Android", ua or "", re.I) else "ios"
+
+
+def pick_mobile(platform):
+    """Which extracted mobile build to serve: prefer the one whose file name matches the platform."""
+    for m in S.mobile:
+        if m["hint"] == platform:
+            return m
+    for m in S.mobile:
+        if m["hint"] is None:
+            return m
+    return S.mobile[0] if S.mobile else None
 
 
 # --------------------------------------------------------------------------
@@ -103,6 +204,8 @@ class State:
 
 S = State()
 S.appjs_cache = None
+S.app_dir = None
+S.mobile = []
 
 
 class FsError(Exception):
@@ -228,6 +331,48 @@ def fs_op(op, a):
         return None
     if op == "copyFile":
         shutil.copy2(vpath_to_real(a["from"]), vpath_to_real(a["to"], True))
+        return None
+    if op == "readdirStat":  # one level, with stat info (used by the mobile build)
+        out = []
+        with os.scandir(vpath_to_real(a["path"])) as it:
+            for e in it:
+                try:
+                    st = e.stat()
+                except OSError:
+                    try:
+                        st = e.stat(follow_symlinks=False)
+                    except OSError:
+                        continue
+                d = stat_dict(st)
+                out.append({"name": e.name, "type": d["type"], "size": d["size"],
+                            "mtimeMs": d["mtimeMs"], "ctimeMs": d["birthtimeMs"] or d["ctimeMs"]})
+        return out
+    if op == "statAll":  # recursive flat list, names relative to `path` (used by the mobile build)
+        root = vpath_to_real(a["path"])
+        out = []
+
+        def walk(d, pre):
+            with os.scandir(d) as it:
+                for e in it:
+                    try:
+                        st = e.stat()
+                    except OSError:
+                        continue
+                    sd = stat_dict(st)
+                    rel = pre + "/" + e.name if pre else e.name
+                    out.append({"name": rel, "type": sd["type"], "size": sd["size"],
+                                "mtimeMs": sd["mtimeMs"], "ctimeMs": sd["birthtimeMs"] or sd["ctimeMs"]})
+                    if sd["type"] == "directory" and not e.is_symlink():
+                        walk(e.path, rel)
+        walk(root, "")
+        return out
+    if op == "copy":  # file or folder
+        src, dst = vpath_to_real(a["from"]), vpath_to_real(a["to"], True)
+        os.makedirs(os.path.dirname(dst), exist_ok=True)
+        if os.path.isdir(src):
+            shutil.copytree(src, dst)
+        else:
+            shutil.copy2(src, dst)
         return None
     if op == "realpath":
         p = vpath_to_real(a["path"])
@@ -451,6 +596,8 @@ class Handler(BaseHTTPRequestHandler):
         path = urllib.parse.unquote(u.path)
         if path == "/" or path == "/index.html":
             return self.serve_index(u)
+        if path.startswith("/m/") or path == "/m":
+            return self.serve_mobile(u, path)
         if path.startswith("/__vault/"):
             return self.serve_vault(path[len("/__vault/"):])
         if path == "/__fs/read":
@@ -512,21 +659,75 @@ class Handler(BaseHTTPRequestHandler):
     # ---- handlers
     def serve_index(self, u):
         q = urllib.parse.parse_qs(u.query)
+        keep = "".join("&%s=%s" % (k, urllib.parse.quote(q[k][0])) for k in ("ui", "platform") if k in q)
+        keep = "?" + keep[1:] if keep else ""
         if "token" in q and secrets.compare_digest(q["token"][0], S.token):
             self.send_response(302)
             self.send_header("Set-Cookie", "%s=%s; Path=/; HttpOnly; SameSite=Strict" % (COOKIE, S.token))
-            self.send_header("Location", "/")
+            self.send_header("Location", "/" + keep)
             self.send_header("Content-Length", "0")
             self.end_headers()
             return
         if not self.authed():
             return self.deny(403, "Open the URL printed by the server (it contains ?token=...).")
+        # phones get the mobile build (when a mobile zip is present), PCs keep the desktop build (asar)
+        ui = (q.get("ui") or [""])[0]
+        ua = self.headers.get("User-Agent") or ""
+        want_mobile = bool(S.mobile) and (ui == "mobile" or (ui != "desktop" and is_mobile_ua(ua)) or S.app_dir is None)
+        if ui == "desktop" and S.app_dir is None:
+            want_mobile = bool(S.mobile)
+        if want_mobile:
+            m = pick_mobile((q.get("platform") or [ua_platform(ua)])[0])
+            self.send_response(302)
+            self.send_header("Location", "/m/%s/%s" % (m["key"], keep))
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            return
+        if S.app_dir is None:
+            return self.deny(404, "No app is available")
         with open(os.path.join(S.app_dir, "index.html"), encoding="utf-8") as f:
             html = f.read()
         boot = "<script>window.__OW=%s;</script>\n<script src=\"shim.js\"></script>\n" % json.dumps(
             {"vault": S.vroot, "version": S.version, "language": S.settings.get("language")})
         html = html.replace("<head>", "<head>\n" + boot, 1)
         self.send_bytes(200, html.encode("utf-8"), "text/html; charset=utf-8")
+
+    def serve_mobile(self, u, path):
+        """/m/<n>/...  -> the extracted mobile build number n."""
+        mm = re.match(r"^/m/(\d+)(/.*)?$", path)
+        entry = next((m for m in S.mobile if mm and m["key"] == mm.group(1)), None)
+        if not entry:
+            return self.deny(404, "Not found")
+        rest = (mm.group(2) or "")
+        if rest == "":
+            self.send_response(302)
+            self.send_header("Location", "/m/%s/%s" % (entry["key"], ("?" + u.query) if u.query else ""))
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            return
+        rel = posixpath.normpath("/" + rest).lstrip("/")
+        if rel in ("", "index.html"):
+            if not self.authed():
+                return self.deny(403, "Open the URL printed by the server (it contains ?token=...).")
+            q = urllib.parse.parse_qs(u.query)
+            platform = (q.get("platform") or [ua_platform(self.headers.get("User-Agent"))])[0]
+            if platform not in ("android", "ios"):
+                platform = "ios"
+            with open(os.path.join(entry["dir"], "index.html"), encoding="utf-8") as f:
+                html = f.read()
+            boot = "<script>window.__OWM=%s;</script>\n<script src=\"mobile-shim.js\"></script>\n" % json.dumps(
+                {"vault": S.vroot.lstrip("/"), "version": entry["version"], "terms": entry["terms"], "platform": platform})
+            html = html.replace("<head>", "<head>\n" + boot, 1)
+            return self.send_bytes(200, html.encode("utf-8"), "text/html; charset=utf-8")
+        if rel == "mobile-shim.js":
+            return self.serve_file(os.path.join(WEB_DIR, "mobile-shim.js"))
+        fp = os.path.join(entry["dir"], *rel.split("/"))
+        base = os.path.realpath(entry["dir"])
+        rp = os.path.realpath(fp)
+        if not rp.startswith(base + os.sep) or not os.path.isfile(rp):
+            return self.deny(404, "Not found")
+        self.serve_file(rp)
 
     def serve_file(self, fp, ranged=False):
         try:
@@ -633,6 +834,11 @@ class Server(ThreadingHTTPServer):
 def main():
     ap = argparse.ArgumentParser(description="Run Obsidian (from obsidian.asar) in a browser")
     ap.add_argument("--asar", help="path to obsidian.asar (needed on first run)")
+    ap.add_argument("--mobile-zip", action="append", default=[], metavar="ZIP",
+                    help="zip of the mobile app's public folder (APK/IPA); phones get this build. "
+                         "Zips in this folder that look like one are picked up automatically.")
+    ap.add_argument("--allow-host", action="append", default=[], metavar="HOST[:PORT]",
+                    help="extra Host header to accept (reverse proxy / LAN address)")
     ap.add_argument("--vault", default="./vault", help="vault directory (created if missing)")
     ap.add_argument("--host", default="127.0.0.1", help="bind address (default: 127.0.0.1)")
     ap.add_argument("--port", type=int, default=8765)
@@ -643,20 +849,35 @@ def main():
     S.verbose = args.verbose
     cache = os.path.abspath(args.cache)
     os.makedirs(cache, exist_ok=True)
-    S.app_dir = prepare_app(args.asar, cache)
+    # mobile builds: --mobile-zip, plus any zip in this folder that looks like one
+    zips = [os.path.abspath(z) for z in args.mobile_zip]
+    for fn in sorted(os.listdir(HERE)):
+        fp = os.path.join(HERE, fn)
+        if fn.lower().endswith(".zip") and fp not in zips and looks_like_mobile_zip(fp):
+            zips.append(fp)
+    for z in zips:
+        if not looks_like_mobile_zip(z):
+            sys.exit("Not an Obsidian mobile public folder zip: %s" % z)
+    S.mobile = prepare_mobile(zips, cache)
+    if not args.asar and not os.path.exists(os.path.join(cache, "app", "package.json")) \
+            and os.path.exists(os.path.join(HERE, "obsidian.asar")):
+        args.asar = os.path.join(HERE, "obsidian.asar")
+    S.app_dir = prepare_app(args.asar, cache, required=not S.mobile)
 
-    with open(os.path.join(S.app_dir, "package.json"), encoding="utf-8") as f:
-        S.version = json.load(f)["version"]
-    with open(os.path.join(S.app_dir, "main.js"), encoding="utf-8", errors="replace") as f:
-        m = re.search(r'"(I understand and agree[^"]*)"', f.read())
-    S.terms = m.group(1) if m else ""
+    S.version, S.terms = "", ""
+    if S.app_dir:
+        with open(os.path.join(S.app_dir, "package.json"), encoding="utf-8") as f:
+            S.version = json.load(f)["version"]
+        with open(os.path.join(S.app_dir, "main.js"), encoding="utf-8", errors="replace") as f:
+            m = re.search(r'"(I understand and agree[^"]*)"', f.read())
+        S.terms = m.group(1) if m else ""
 
     vault = os.path.abspath(args.vault)
     fresh = not os.path.exists(vault)
     os.makedirs(vault, exist_ok=True)
     if fresh and not os.listdir(vault):
-        sandbox = os.path.join(S.app_dir, "sandbox")
-        if os.path.isdir(sandbox):
+        sandbox = os.path.join(S.app_dir, "sandbox") if S.app_dir else ""
+        if sandbox and os.path.isdir(sandbox):
             shutil.copytree(sandbox, vault, dirs_exist_ok=True)
             print("Created a new vault from Obsidian's sample notes: %s" % vault)
     S.vault = vault
@@ -682,6 +903,7 @@ def main():
     hosts = {"%s:%d" % (h, args.port) for h in ("127.0.0.1", "localhost", "[::1]")}
     if args.host not in ("0.0.0.0", "::", "127.0.0.1", "localhost"):
         hosts.add("%s:%d" % (args.host, args.port))
+    hosts.update(h for h in args.allow_host)
     S.allowed_hosts = {h.lower() for h in hosts}
     if args.host in ("0.0.0.0", "::"):
         print("WARNING: listening on all interfaces. Anyone who gets the token URL can read/write the vault.\n"
@@ -689,7 +911,11 @@ def main():
 
     srv = Server((args.host, args.port), Handler)
     show_host = "localhost" if args.host in ("0.0.0.0", "::", "127.0.0.1") else args.host
-    print("\nObsidian %s  |  vault: %s" % (S.version, vault))
+    print("\nObsidian %s  |  vault: %s" % (S.version or "(mobile only)", vault))
+    for m in S.mobile:
+        print("Mobile build: %s (Obsidian %s)  -> served to phones" % (m["name"], m["version"]))
+    if S.mobile and S.app_dir:
+        print("PCs get the desktop build; add ?ui=mobile or ?ui=desktop to the URL to force one.")
     print("Open:  http://%s:%d/?token=%s\n" % (show_host, args.port, S.token))
     try:
         srv.serve_forever()
