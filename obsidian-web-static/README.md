@@ -62,7 +62,7 @@ obsidian-web-static/
 2回目以降は「開く」だけです(ブラウザを閉じた後はフォルダへのアクセス許可を求められます)。
 
 ## モバイル版(APK / IPA の `public` フォルダ)について
-スマホ版Obsidianの `public` フォルダ(Androidは APK の `assets/public`、iOSは IPA の `Payload/Obsidian.app/public`)を、上の `obsidian-mobile/` または `obsidian-mobile.zip` として置くか、ランチャーで手動で選びます。
+スマホ版Obsidianの `public` フォルダ(Androidは APK の `assets/public`、iOSは IPA の `Payload/App.app/public`)を、上の `obsidian-mobile/` または `obsidian-mobile.zip` として置くか、ランチャーで手動で選びます。
 
 - モバイル版はElectronではなくCapacitorで動くため、`mobile-shim.js` がネイティブ側のプラグイン(ファイル操作・端末情報・クリップボード等)をブラウザ上で代わりに実装します。`app.js` は書き換えません。
 - ランチャーの「モバイル版zipを読み込んだ場合の動作」で **iOS版 / Android版** を選べます(「自動」は開いている端末で判定: Androidのブラウザ→Android動作、それ以外→iOS動作。ファイル名は見ません。Android/iOSでvault作成画面などの挙動が少し違います)。

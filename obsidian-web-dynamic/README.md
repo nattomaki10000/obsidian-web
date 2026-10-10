@@ -15,7 +15,7 @@ python server.py --asar obsidian.asar --vault ./MyVault
 - オプション: `--port`, `--host`, `--cache`, `--verbose`, `--mobile-zip`, `--allow-host`
 
 ## スマホ版(APK / IPA の `public` フォルダのzip)も配信する
-スマホ版Obsidianの `public` フォルダ(Androidは APK の `assets/public`、iOSは IPA の `Payload/Obsidian.app/public`)をzipにして、**この `server.py` と同じフォルダに置くだけ**です(`--mobile-zip public.zip` で場所を指定してもOK)。
+スマホ版Obsidianの `public` フォルダ(Androidは APK の `assets/public`、iOSは IPA の `Payload/App.app/public`)をzipにして、**この `server.py` と同じフォルダに置くだけ**です(`--mobile-zip public.zip` で場所を指定してもOK)。
 
 ```bash
 python server.py --asar obsidian.asar --vault ./MyVault     # 同じフォルダに *.zip があれば自動で見つけます

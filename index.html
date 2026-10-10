@@ -121,6 +121,7 @@ footer{border-top:1px solid var(--line);padding-top:1.5rem;color:var(--muted);fo
     <li><a href="#dynamic">サーバー版</a></li>
     <li><a href="#static">静的サイト版</a></li>
     <li><a href="#asar">asarの場所</a></li>
+    <li><a href="#mobile">スマホ版の場所</a></li>
     <li><a href="#limits">制限</a></li>
     <li><a href="#files">フォルダ構成</a></li>
   </ul>
@@ -129,7 +130,7 @@ footer{border-top:1px solid var(--line);padding-top:1.5rem;color:var(--muted);fo
 <main>
   <header id="about">
     <h1>Obsidianを、<br>普通のブラウザで。</h1>
-    <p class="lead">自分の <code>obsidian.asar</code>(Obsidian 1.14.4で検証)を、Electronアプリではなくブラウザで開くためのラッパーです。使い方に合わせて、サーバー版と静的サイト版の2つがあります。</p>
+    <p class="lead">自分の <code>obsidian.asar</code>(Obsidian 1.14.4で検証)を、Electronアプリではなくブラウザで開くためのラッパーです。使い方に合わせて、サーバー版と静的サイト版の2つがあります。スマホ版Obsidianの <code>public</code> フォルダ(APK / IPA から取り出したもの)にも対応しています。</p>
     <div class="meta">
       <a class="btn main" href="https://github.com/nattomaki10000/obsidian-web">GitHubリポジトリ</a>
       <a class="btn sub" href="https://nattomaki10000.github.io/obsidian-web/obsidian-web-static/">静的サイト版を試す</a>
@@ -192,11 +193,12 @@ python server.py --asar obsidian.asar --vault ./MyVault</pre><button class="copy
       <li>初回だけ asar を <code>.obsidian-web/app</code> に展開します。2回目以降は <code>--asar</code> は不要です。</li>
       <li><code>--vault</code> のフォルダがなければ作成し、サンプルノートを入れます。</li>
       <li>トークンは <code>.obsidian-web/token</code> に保存され、再起動後も同じURLが使えます。</li>
-      <li>オプション: <code>--port</code> <code>--host</code> <code>--cache</code> <code>--verbose</code></li>
+      <li>スマホ版の <code>public</code> フォルダのzipを <code>server.py</code> と同じフォルダに置く(または <code>--mobile-zip</code> で指定する)と、スマホ・タブレットにはモバイル版、PCにはasar版を同じURLで出し分けます。<code>?ui=mobile</code> / <code>?ui=desktop</code> で強制もできます。</li>
+      <li>オプション: <code>--port</code> <code>--host</code> <code>--cache</code> <code>--verbose</code> <code>--mobile-zip</code> <code>--allow-host</code></li>
     </ul>
 
     <h3>構成</h3>
-    <p><code>server.py</code>(静的配信 / 同期IPC / vault内限定のファイルAPI / 画像配信)と、<code>web/shim.js</code>(<code>require('electron')</code> や <code>fs</code>・<code>path</code> などのブラウザ代替)でできています。</p>
+    <p><code>server.py</code>(静的配信 / 同期IPC / vault内限定のファイルAPI / 画像配信)と、<code>web/shim.js</code>(<code>require('electron')</code> や <code>fs</code>・<code>path</code> などのブラウザ代替)、<code>web/mobile-shim.js</code>(スマホ版用の代替)でできています。</p>
 
     <h3>セキュリティ</h3>
     <ul class="plain">
@@ -218,21 +220,21 @@ python -m http.server 8800      # → http://localhost:8800/</pre><button class=
     <p>ランチャー(<code>index.html</code>)で、①本体を読み込む → ②フォルダを選ぶ → ③開く、の順に進めます。</p>
 
     <h3>Obsidian本体の渡し方</h3>
-    <p>アップロード不要にもできます。</p>
+    <p>アップロード不要にもできます。ランチャーは、<strong>開いた端末に合わせて</strong>PCにはデスクトップ版(asar)、スマホ・タブレットにはモバイル版(<code>public</code> フォルダ)を自動で読み込みます。</p>
     <div class="tablewrap">
       <table>
-        <thead><tr><th>方法</th><th>やること</th></tr></thead>
+        <thead><tr><th>方法</th><th>PC用</th><th>スマホ用</th></tr></thead>
         <tbody>
-          <tr><th>A</th><td><code>obsidian.asar</code> を <code>obsidian-web-static/</code> に置く</td></tr>
-          <tr><th>B</th><td><code>python prepare.py obsidian.asar</code> で <code>obsidian/</code> と一覧 <code>ow-files.json</code> を作る</td></tr>
-          <tr><th>C</th><td>何も置かず、ランチャーの「asarファイルを手動で選ぶ」から指定する</td></tr>
+          <tr><th>A(推奨)</th><td><code>python prepare.py obsidian.asar</code> で <code>obsidian/</code> と一覧 <code>ow-files.json</code> を作る</td><td><code>python prepare.py public.zip</code> で <code>obsidian-mobile/</code> と一覧 <code>ow-files.json</code> を作る</td></tr>
+          <tr><th>B(手軽)</th><td><code>obsidian.asar</code> を <code>obsidian-web-static/</code> に置く</td><td><code>obsidian-mobile.zip</code> を <code>obsidian-web-static/</code> に置く</td></tr>
+          <tr><th>C</th><td colspan="2">何も置かず、ランチャーの「asar / モバイル版zipを手動で選ぶ」から指定する</td></tr>
         </tbody>
       </table>
     </div>
-    <p>AとBは初回アクセス時に自動で読み込まれます(両方あればB優先)。差し替えたあとは「このサイトから読み込み直す」を押してください。</p>
+    <p>AとBは初回アクセス時に自動で読み込まれます(同じ端末向けに両方あればA優先。片方の種類しか無ければどの端末でもそれを使います)。<code>?ui=mobile</code> / <code>?ui=desktop</code> をURLに付けると、種類を指定して読み込み直せます。差し替えたあとは「このサイトから読み込み直す」を押してください。</p>
 
     <h3>構成と対応ブラウザ</h3>
-    <p><code>index.html</code> / <code>launcher.js</code>(ランチャー)、<code>sw.js</code>(Service Worker)、<code>app-shim.js</code>(Electron/Node APIの代替)、<code>prepare.py</code>(任意)。</p>
+    <p><code>index.html</code> / <code>launcher.js</code>(ランチャー)、<code>sw.js</code>(Service Worker)、<code>app-shim.js</code>(Electron/Node APIの代替)、<code>mobile-shim.js</code>(スマホ版が使うCapacitor APIの代替)、<code>prepare.py</code>(任意)。</p>
     <p>フォルダ選択はChrome/Edgeなどのデスクトップ版のみ対応です。Firefox/Safariでは「ブラウザ内お試しvault」だけが使えます(Safariは動かないことがあります)。</p>
   </section>
 
@@ -266,6 +268,28 @@ python -m http.server 8800      # → http://localhost:8800/</pre><button class=
     </div>
   </section>
 
+  <section id="mobile">
+    <h2>スマホ版の public フォルダの場所</h2>
+    <p>スマホ版Obsidianの <code>public</code> フォルダも使えます。IPA / APK から次の場所を取り出してください。AndroidのものでもiOSのものでも、どちらでも動きます。</p>
+
+    <h3>🍎 iOS</h3>
+    <ul class="plain">
+      <li><strong>IPA</strong>
+        <code class="path">md.obsidian/Payload/App.app/public/</code>
+      </li>
+    </ul>
+
+    <h3>🤖 Android</h3>
+    <ul class="plain">
+      <li><strong>APK</strong><br>
+        <a href="https://obsidian.md/download" target="_blank" rel="noopener noreferrer">obsidianダウンロード</a>からAPKをダウンロードし、展開
+        <code class="path">Obsidian-x.x.x/assets/public/</code>
+      </li>
+    </ul>
+
+    <p>取り出した <code>public</code> フォルダをzipにして使います。静的サイト版は <code>obsidian-mobile.zip</code> として置くか、<code>prepare.py</code> でフォルダにして <code>obsidian-mobile/</code> として置きます。サーバー版は <code>server.py</code> と同じフォルダに置きます。</p>
+  </section>
+
   <section id="limits">
     <h2>共通の制限</h2>
     <ul class="plain">
@@ -284,12 +308,14 @@ python -m http.server 8800      # → http://localhost:8800/</pre><button class=
 ├── obsidian-web-dynamic/    サーバー版
 │   ├── server.py
 │   ├── web/shim.js
+│   ├── web/mobile-shim.js
 │   └── README.md
 └── obsidian-web-static/     静的サイト版
     ├── index.html
     ├── launcher.js
     ├── sw.js
     ├── app-shim.js
+    ├── mobile-shim.js
     ├── prepare.py
     └── README.md</pre></div>
   </section>
