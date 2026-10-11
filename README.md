@@ -16,6 +16,11 @@
 
 迷ったら: **PCのフォルダをそのまま開きたい → 静的サイト版**、**サーバーマシンのフォルダを複数端末から使いたい → サーバー版**。
 
+
+> [!TIP]
+> 静的サイトを改造して作った**Cloudflare Pages + Workers KV 版** (スマホ等と同期・完全無料)もあります！
+> くわしくは[KV + Pages版](https://github.com/nattomaki10000/obsidian-web/tree/main/obsidian-web-kv-pages)
+
 ---
 
 ## 1. サーバー版(`obsidian-web-dynamic/`)
@@ -108,6 +113,16 @@ A・Bは初回アクセス時に自動で読み込まれます(両方あればB�
 ### 🐧 Linux
 * **自動アップデート版**
   `/home/[ユーザー名]/.config/obsidian/`
+
+### 🍎 iOS
+* **IPA**
+  `md.obsidian/Payload/App.app/public/`
+
+### 🤖 Android
+* **APK**
+[obsidianダウンロード](https://obsidian.md/download)からAPKをダウンロードし、展開
+  `Obsidian-x.x.x/assets/public/`
+
 
 ## フォルダ構成
 ```
