@@ -18,7 +18,7 @@
 
 
 > [!TIP]
-> 静的サイトを改造して作った**Cloudflare Pages + Workers KV 版** (スマホ等と同期・完全無料)もあります！
+> 静的サイト版を改造して作った**Cloudflare Pages + Workers KV 版** (スマホ等と同期・完全無料)もあります！
 > くわしくは[KV + Pages版](https://github.com/nattomaki10000/obsidian-web/tree/main/obsidian-web-kv-pages)
 
 ---
