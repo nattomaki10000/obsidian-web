@@ -1,142 +1,99 @@
 # obsidian-web
 
 自分の `obsidian.asar`(Obsidian 1.14.4で検証)を、Electronアプリではなく**普通のブラウザで**使うためのラッパーです。
-どちらの版も、スマホ版の **APK / IPA から取り出した `public` フォルダ(zip)** に対応しています。アクセスした端末で、PCにはasar、スマホにはモバイル版を出し分けます(詳しくは各フォルダのREADME)。
-用途に応じて2つの版があります。
+スマホ版Obsidianの **APK / IPA から取り出した `public` フォルダ(zip)** にも対応していて、アクセスした端末に合わせて、PCにはasar版、スマホにはモバイル版を出し分けます。
 
-| | **サーバー版** `obsidian-web-dynamic/` | **静的サイト版** `obsidian-web-static/` |
-|---|---|---|
-| 必要なもの | Python 3(標準ライブラリのみ) | 静的ファイルの配信だけ(HTTPS or localhost) |
-| vault(ノートの場所) | サーバーを動かすマシン上のフォルダ | ブラウザで選んだPCのフォルダ(またはブラウザ内) |
-| Obsidian本体 | 起動時に `--asar` で指定、サーバー側で展開 | ランチャーが読み込み、ブラウザ内に保存 |
-| 対応ブラウザ | 一般的なブラウザ(検証はChromium) | フォルダ選択はChrome/Edge等のChromium系のみ |
-| 別のPC/スマホから | 可(トークン付きURL + トンネル等) | ホスト先を開くだけ。ただしフォルダ選択はデスクトップChromiumのみ |
-| 外部変更の検知 | 約1.5秒ごとのポーリング | 約4秒ごと + フォーカス復帰時 |
-| 向いている用途 | 手元・自宅サーバーで安定して使う | サーバーを立てたくない、PCのフォルダをそのまま使いたい |
+> [!IMPORTANT]
+> **Obsidian本体は再配布できません。** このリポジトリにObsidian本体は含まれていません。`obsidian.asar` や `public` フォルダは、ご自身が入手したものを使ってください。公開サイトに置く場合も、本体を含めないでください。
 
-迷ったら: **PCのフォルダをそのまま開きたい → 静的サイト版**、**サーバーマシンのフォルダを複数端末から使いたい → サーバー版**。
+## 3つの版
 
+使い方に合わせて、3つの版があります。**詳しい使い方は、各フォルダのREADMEを見てください。**
 
-> [!TIP]
-> 静的サイト版を改造して作った**Cloudflare Pages + Workers KV 版** (スマホ等と同期・完全無料)もあります！
-> くわしくは[KV + Pages版](https://github.com/nattomaki10000/obsidian-web/tree/main/obsidian-web-kv-pages)
+| | [サーバー版](obsidian-web-dynamic/) | [静的サイト版](obsidian-web-static/) | [KV + Pages版](obsidian-web-kv-pages/) |
+|---|---|---|---|
+| フォルダ | `obsidian-web-dynamic/` | `obsidian-web-static/` | `obsidian-web-kv-pages/` |
+| 必要なもの | Python 3(標準ライブラリのみ) | 静的ファイルの配信だけ(HTTPS or localhost) | Cloudflareアカウント(無料枠でOK) |
+| vault(ノートの場所) | サーバーを動かすマシン上のフォルダ | ブラウザで選んだPCのフォルダ(またはブラウザ内) | Workers KV(クラウド) |
+| Obsidian本体 | 起動時に `--asar` で指定 | ランチャーが読み込み、ブラウザ内に保存 | 端末ごとに読み込む(サイトには置かない) |
+| 別の端末から | 可(トークン付きURL + トンネル等) | ホスト先を開くだけ。ただしフォルダ選択はデスクトップChromiumのみ | 可。**同じvaultを全端末で共有** |
+| 認証 | トークン付きURL | なし | パスワード(ログイン画面) |
+| 外部変更の検知 | 約1.5秒ごと | 約4秒ごと + フォーカス復帰時 | 他端末の変更は最大10分ほど(☁クリックで即時) |
+| 費用 | 自前のサーバー | 静的ホスティング | 無料枠の範囲(KVの書き込みは1日1,000回まで) |
 
----
+### どれを使う?
 
-## 1. サーバー版(`obsidian-web-dynamic/`)
+- **PCのフォルダをそのまま開きたい** → [静的サイト版](obsidian-web-static/)
+- **自宅サーバーなどのフォルダを、複数の端末から使いたい** → [サーバー版](obsidian-web-dynamic/)
+- **サーバーなしで、PC・スマホ・タブレットから同じvaultを使いたい** → [KV + Pages版](obsidian-web-kv-pages/)
 
-Electronのメインプロセス相当をPythonで置き換えます。
+## 各版のひとこと
 
-```bash
-cd obsidian-web-dynamic
-python server.py --asar obsidian.asar --vault ./MyVault
-```
-表示された `http://localhost:8765/?token=...` をブラウザで開きます。
+- **サーバー版**: Electronのメインプロセス相当をPythonで置き換えます。vaultはサーバー上の実フォルダです。
+- **静的サイト版**: ファイルを置くだけで動きます。Service Workerとブラウザ内展開で本体を動かし、フォルダ選択はFile System Access APIで行います。[インストールなしで試せます](https://nattomaki10000.github.io/obsidian-web/obsidian-web-static/)。
+- **KV + Pages版**: 静的サイト版を改造し、Cloudflare PagesとWorkers KVで動かします。zipをアップロードしてSecretにパスワードを入れるだけで使えます。
 
-- 初回だけasarを `.obsidian-web/app` に展開します。2回目以降は `--asar` 不要です。
-- `--vault` が存在しなければ作成し、サンプルノートを入れます。
-- トークンは `.obsidian-web/token` に保存され、再起動後も同じURLが使えます。
-- オプション: `--port`, `--host`, `--cache`, `--verbose`
+## Obsidian本体の入手場所
 
-**構成**: `server.py`(静的配信 / 同期IPC / vault内限定のファイルAPI / 画像配信)、`web/shim.js`(`require('electron'|'fs'|'path'...)` 等のブラウザ代替)、`README.md`
+<details>
+<summary>obsidian.asar(PC版)</summary>
 
-**セキュリティ**
-- 既定は `127.0.0.1` のみ。Hostヘッダ検証 + トークンCookie(SameSite=Strict) + 独自ヘッダで、他サイトからの操作を拒否します。
-- ファイル操作はvault内に限定(シンボリックリンクでの脱出も拒否)。
-- `0.0.0.0` で公開する場合は、必ずSSHトンネルやHTTPS付きリバースプロキシ越しにしてください。
+`[ユーザー名]` は自分のアカウント名に置き換えてください。場所は環境によって違うことがあります。
 
----
-
-## 2. 静的サイト版(`obsidian-web-static/`)
-
-サーバーなしで、ファイルを置くだけで動きます。本体の読み込みはService Worker + ブラウザ内展開で行い、ファイル操作はFile System Access APIです。
-
-```bash
-cd obsidian-web-static
-python -m http.server 8800      # → http://localhost:8800/
-```
-ランチャー(`index.html`)で ①本体を読み込む → ②フォルダを選ぶ → ③開く。
-
-### Obsidian本体の渡し方(アップロード不要にできます)
-| 方法 | やること |
+| OS | 場所 |
 |---|---|
-| **A** | `obsidian.asar` を `obsidian-web-static/` に置く |
-| **B** | `python prepare.py obsidian.asar` で `obsidian/` と一覧 `ow-files.json` を作る |
-| **C** | 何も置かず、ランチャーの「asarファイルを手動で選ぶ」から指定する |
+| Windows(自動アップデート版・推奨) | `C:\Users\[ユーザー名]\AppData\Roaming\obsidian\` |
+| Windows(通常のインストール先) | `C:\Users\[ユーザー名]\AppData\Local\Obsidian\resources\obsidian.asar` |
+| Windows(こちらかもしれません) | `C:\Users\[ユーザー名]\AppData\Local\Programs\Obsidian\resources\obsidian.asar` |
+| Mac(自動アップデート版・推奨) | `/Users/[ユーザー名]/Library/Application Support/obsidian/` |
+| Mac(アプリ本体の中) | `/Applications/Obsidian.app/Contents/Resources/obsidian.asar` |
+| Linux(自動アップデート版) | `/home/[ユーザー名]/.config/obsidian/` |
 
-A・Bは初回アクセス時に自動で読み込まれます(両方あればB優先)。差し替え後は「このサイトから読み込み直す」を押してください。
+近道: Windowsは `Win + R` で `%APPDATA%\obsidian`、MacはFinderで `Cmd + Shift + G` から `~/Library/Application Support/obsidian` を開くと直接移動できます。
 
-**構成**: `index.html` / `launcher.js`(ランチャー)、`sw.js`(Service Worker)、`app-shim.js`(Electron/Node APIの代替)、`prepare.py`(任意)、`README.md`
+</details>
 
-**対応ブラウザ**: フォルダ選択はChrome/Edgeなどデスクトップ版のみ。Firefox/Safariは「ブラウザ内お試しvault」だけが使えます(Safariは動かないことがあります)。
+<details>
+<summary>public フォルダ(スマホ版)</summary>
 
----
+取り出した `public` フォルダをzipにして使います。AndroidのものでもiOSのものでも動きます。
 
-## 共通の注意
+| OS | 場所 |
+|---|---|
+| iOS(IPA) | `md.obsidian/Payload/App.app/public/` |
+| Android(APK) | [公式サイト](https://obsidian.md/download)からAPKをダウンロードして展開し、`Obsidian-x.x.x/assets/public/` |
 
-### 公開について(重要)
-**Obsidian本体は再配布できません。**
-- このリポジトリ/フォルダのコードには、Obsidian本体は含まれていません。
+</details>
 
-### 共通の制限
-- 1サーバー(静的版は1ブラウザプロファイル)につき1 vault。切り替えUIは動きません。
+## 共通の制限
+
+- vaultは、1サーバー(静的版・KV版は1ブラウザプロファイル)につき1つです。切り替えUIは動きません。
 - 「既定のアプリで開く」「エクスプローラーで表示」、Webビューア、スクリーンショット系は動きません。
-- ごみ箱は `<vault>/.trash`。
-- `app.js` は配信時に1箇所だけ置換します(設定画面などを別ウィンドウにしない)。元のasarは変更しません。
-- コミュニティプラグイン/テーマの取得は、サーバー版ではサーバー経由、静的版ではブラウザのCORS制限を受けます。
-
-## Obsidian本体（obsidian.asar）の格納場所（フルパス）（たぶんです。ない場合は頑張って探してください。）
-
-お使いのOSに合わせて、以下のパスから `obsidian.asar`（または `obsidian-1.xx.x.asar`）を取得してください。
-※ `[ユーザー名]` または `[Username]` の部分は、ご自身のPCのアカウント名に置き換えてください。
-
-### 💻 Windows
-* **自動アップデート版（推奨・最新データ）**
-  `C:\Users\[ユーザー名]\AppData\Roaming\obsidian\`
-* **通常のインストール先**
-  `C:\Users\[ユーザー名]\AppData\Local\Obsidian\resources\obsidian.asar`
-* **こちらかもしれません**
-  `C:\Users\[ユーザー名]\AppData\Local\Programs\Obsidian\resources\obsidian.asar`
-
-> 💡 **Windowsでの一発移動の裏技:**
-> `Win + R` キーを同時に押し、ファイル名を指定して実行画面に `%APPDATA%\obsidian` と貼り付けて Enter を押すと、対象のフォルダが直接開きます。
-
-### 🍎 Mac (macOS)
-* **自動アップデート版（推奨・最新データ）**
-  `/Users/[ユーザー名]/Library/Application Support/obsidian/`
-* **アプリケーション本体の中**
-  `/Applications/Obsidian.app/Contents/Resources/obsidian.asar`
-
-> 💡 **Macでの一発移動の裏技:**
-> Finderを開いた状態で `Cmd + Shift + G` キーを同時に押し、フォルダの場所を入力画面に `~/Library/Application Support/obsidian` と貼り付けて Enter を押すと直接移動できます。
-
-### 🐧 Linux
-* **自動アップデート版**
-  `/home/[ユーザー名]/.config/obsidian/`
-
-### 🍎 iOS
-* **IPA**
-  `md.obsidian/Payload/App.app/public/`
-
-### 🤖 Android
-* **APK**
-[obsidianダウンロード](https://obsidian.md/download)からAPKをダウンロードし、展開
-  `Obsidian-x.x.x/assets/public/`
-
+- ごみ箱は `<vault>/.trash` です。
+- コミュニティプラグインやテーマの取得は、サーバー版ではサーバー経由、静的サイト版・KV版ではブラウザのCORS制限を受けます。
 
 ## フォルダ構成
+
 ```
 .
 ├── README.md                  ← このファイル
+├── index.html                 紹介ページ(GitHub Pages)
 ├── obsidian-web-dynamic/      サーバー版
 │   ├── server.py
 │   ├── web/shim.js
+│   ├── web/mobile-shim.js
 │   └── README.md
-└── obsidian-web-static/       静的サイト版
-    ├── index.html
-    ├── launcher.js
-    ├── sw.js
-    ├── app-shim.js
-    ├── prepare.py
+├── obsidian-web-static/       静的サイト版
+│   ├── index.html
+│   ├── launcher.js
+│   ├── sw.js
+│   ├── app-shim.js
+│   ├── mobile-shim.js
+│   ├── prepare.py
+│   └── README.md
+└── obsidian-web-kv-pages/     KV + Pages版
+    ├── obsidian-web-kv-pages.zip   Pagesにアップロードするzip
     └── README.md
 ```
+
+Obsidianは、その開発元の商標・著作物です。このプロジェクトは公式のものではありません。

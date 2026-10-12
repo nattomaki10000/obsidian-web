@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>obsidian-web — Obsidianを普通のブラウザで動かすラッパー</title>
-<meta name="description" content="手持ちの obsidian.asar を、Electronアプリではなく普通のブラウザで使うためのラッパー。サーバー版と静的サイト版の2種類。">
+<meta name="description" content="手持ちの obsidian.asar を、Electronアプリではなく普通のブラウザで使うためのラッパー。サーバー版・静的サイト版・KV + Pages版の3種類。">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700;900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -68,7 +68,7 @@ p{margin:.6rem 0}
 
 /* tables */
 .tablewrap{overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:10px}
-table{border-collapse:collapse;width:100%;min-width:640px;font-size:.93rem;line-height:1.6}
+table{border-collapse:collapse;width:100%;min-width:780px;font-size:.93rem;line-height:1.6}
 th,td{padding:.7rem .9rem;text-align:left;vertical-align:top;border-bottom:1px solid var(--line)}
 tr:last-child th,tr:last-child td{border-bottom:0}
 thead th{background:var(--accent-soft);font-weight:700}
@@ -76,7 +76,7 @@ tbody th{font-weight:500;color:var(--muted);white-space:nowrap}
 
 /* chooser */
 .choose{display:grid;gap:1rem;margin-top:1.25rem}
-@media (min-width:700px){.choose{grid-template-columns:1fr 1fr}}
+@media (min-width:700px){.choose{grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}}
 .choose div{background:var(--surface);border:1px solid var(--line);border-left:5px solid var(--accent);border-radius:10px;padding:1rem 1.2rem}
 .choose p:first-child{margin-top:0;color:var(--muted)}
 .choose strong{font-size:1.05rem}
@@ -87,8 +87,8 @@ pre{margin:0;background:var(--code-bg);color:var(--code-ink);font-family:var(--m
 .copy{position:absolute;top:.5rem;right:.5rem;font:inherit;font-size:.78rem;background:#ffffff1f;color:var(--code-ink);border:1px solid #ffffff44;border-radius:6px;padding:.2rem .6rem;cursor:pointer}
 .copy:hover{background:#ffffff38}
 
-ul.plain{padding-left:1.2rem}
-ul.plain li{margin:.3rem 0}
+ul.plain,ol.plain{padding-left:1.4rem}
+ul.plain li,ol.plain li{margin:.3rem 0}
 
 /* notice */
 .notice{background:var(--warn-bg);border:2px solid var(--warn-line);color:var(--warn-ink);border-radius:10px;padding:1rem 1.2rem}
@@ -117,9 +117,10 @@ footer{border-top:1px solid var(--line);padding-top:1.5rem;color:var(--muted);fo
   <p class="name">obsidian-web</p>
   <ul>
     <li><a href="#about">概要</a></li>
-    <li><a href="#choose">どちらを使う?</a></li>
+    <li><a href="#choose">どれを使う?</a></li>
     <li><a href="#dynamic">サーバー版</a></li>
     <li><a href="#static">静的サイト版</a></li>
+    <li><a href="#kv">KV + Pages版</a></li>
     <li><a href="#asar">asarの場所</a></li>
     <li><a href="#mobile">スマホ版の場所</a></li>
     <li><a href="#limits">制限</a></li>
@@ -130,11 +131,11 @@ footer{border-top:1px solid var(--line);padding-top:1.5rem;color:var(--muted);fo
 <main>
   <header id="about">
     <h1>Obsidianを、<br>普通のブラウザで。</h1>
-    <p class="lead">自分の <code>obsidian.asar</code>(Obsidian 1.14.4で検証)を、Electronアプリではなくブラウザで開くためのラッパーです。使い方に合わせて、サーバー版と静的サイト版の2つがあります。スマホ版Obsidianの <code>public</code> フォルダ(APK / IPA から取り出したもの)にも対応しています。</p>
+    <p class="lead">自分の <code>obsidian.asar</code>(Obsidian 1.14.4で検証)を、Electronアプリではなくブラウザで開くためのラッパーです。使い方に合わせて、サーバー版・静的サイト版・KV + Pages版の3つがあります。スマホ版Obsidianの <code>public</code> フォルダ(APK / IPA から取り出したもの)にも対応しています。</p>
     <div class="meta">
       <a class="btn main" href="https://github.com/nattomaki10000/obsidian-web">GitHubリポジトリ</a>
       <a class="btn sub" href="https://nattomaki10000.github.io/obsidian-web/obsidian-web-static/">静的サイト版を試す</a>
-      <a class="btn sub" href="#choose">どちらを使うか見る</a>
+      <a class="btn sub" href="#choose">どれを使うか見る</a>
     </div>
 
     <div class="flow" aria-label="仕組みの概略">
@@ -154,7 +155,7 @@ footer{border-top:1px solid var(--line);padding-top:1.5rem;color:var(--muted);fo
   </section>
 
   <section id="choose">
-    <h2>どちらを使う?</h2>
+    <h2>どれを使う?</h2>
     <div class="choose">
       <div>
         <p>PCのフォルダをそのまま開きたい</p>
@@ -164,20 +165,26 @@ footer{border-top:1px solid var(--line);padding-top:1.5rem;color:var(--muted);fo
         <p>サーバーマシンのフォルダを、複数の端末から使いたい</p>
         <strong>→ サーバー版</strong>
       </div>
+      <div>
+        <p>サーバーなしで、PC・スマホ・タブレットから同じvaultを使いたい</p>
+        <strong>→ KV + Pages版</strong>
+      </div>
     </div>
 
-    <h3>2つの版の違い</h3>
+    <h3>3つの版の違い</h3>
     <div class="tablewrap">
       <table>
-        <thead><tr><th></th><th>サーバー版 <code>obsidian-web-dynamic/</code></th><th>静的サイト版 <code>obsidian-web-static/</code></th></tr></thead>
+        <thead><tr><th></th><th>サーバー版 <code>obsidian-web-dynamic/</code></th><th>静的サイト版 <code>obsidian-web-static/</code></th><th>KV + Pages版 <code>obsidian-web-kv-pages/</code></th></tr></thead>
         <tbody>
-          <tr><th>必要なもの</th><td>Python 3(標準ライブラリのみ)</td><td>静的ファイルの配信だけ(HTTPS または localhost)</td></tr>
-          <tr><th>vault(ノートの場所)</th><td>サーバーを動かすマシン上のフォルダ</td><td>ブラウザで選んだPCのフォルダ(またはブラウザ内)</td></tr>
-          <tr><th>Obsidian本体</th><td>起動時に <code>--asar</code> で指定し、サーバー側で展開</td><td>ランチャーが読み込み、ブラウザ内に保存</td></tr>
-          <tr><th>対応ブラウザ</th><td>一般的なブラウザ(検証はChromium)</td><td>フォルダ選択はChrome/Edgeなどデスクトップ版のChromium系のみ</td></tr>
-          <tr><th>別のPC・スマホから</th><td>可(トークン付きURL + トンネル等)</td><td>ホスト先を開くだけ。ただしフォルダ選択はデスクトップChromiumのみ</td></tr>
-          <tr><th>外部変更の検知</th><td>約1.5秒ごとにポーリング</td><td>約4秒ごと + フォーカス復帰時</td></tr>
-          <tr><th>向いている用途</th><td>手元・自宅サーバーで安定して使う</td><td>サーバーを立てたくない、PCのフォルダをそのまま使いたい</td></tr>
+          <tr><th>必要なもの</th><td>Python 3(標準ライブラリのみ)</td><td>静的ファイルの配信だけ(HTTPS または localhost)</td><td>Cloudflareアカウント(無料枠でOK)</td></tr>
+          <tr><th>vault(ノートの場所)</th><td>サーバーを動かすマシン上のフォルダ</td><td>ブラウザで選んだPCのフォルダ(またはブラウザ内)</td><td>Workers KV(クラウド)</td></tr>
+          <tr><th>Obsidian本体</th><td>起動時に <code>--asar</code> で指定し、サーバー側で展開</td><td>ランチャーが読み込み、ブラウザ内に保存</td><td>端末ごとに読み込む(サイトには置かない)</td></tr>
+          <tr><th>対応ブラウザ</th><td>一般的なブラウザ(検証はChromium)</td><td>フォルダ選択はChrome/Edgeなどデスクトップ版のChromium系のみ</td><td>クラウドvaultを使うので、フォルダ選択は不要</td></tr>
+          <tr><th>別のPC・スマホから</th><td>可(トークン付きURL + トンネル等)</td><td>ホスト先を開くだけ。ただしフォルダ選択はデスクトップChromiumのみ</td><td>可。<strong>同じvaultを全端末で共有</strong></td></tr>
+          <tr><th>認証</th><td>トークン付きURL</td><td>なし</td><td>パスワード(ログイン画面)</td></tr>
+          <tr><th>外部変更の検知</th><td>約1.5秒ごとにポーリング</td><td>約4秒ごと + フォーカス復帰時</td><td>他端末の変更は最大10分ほど(☁クリックで即時)</td></tr>
+          <tr><th>費用</th><td>自前のサーバー</td><td>静的ホスティング</td><td>無料枠の範囲(KVの書き込みは1日1,000回まで)</td></tr>
+          <tr><th>向いている用途</th><td>手元・自宅サーバーで安定して使う</td><td>サーバーを立てたくない、PCのフォルダをそのまま使いたい</td><td>サーバーなしで、複数端末から同じvaultを使いたい</td></tr>
         </tbody>
       </table>
     </div>
@@ -238,6 +245,100 @@ python -m http.server 8800      # → http://localhost:8800/</pre><button class=
     <p>フォルダ選択はChrome/Edgeなどのデスクトップ版のみ対応です。Firefox/Safariでは「ブラウザ内お試しvault」だけが使えます(Safariは動かないことがあります)。</p>
   </section>
 
+  <section id="kv">
+    <h2>KV + Pages版</h2>
+    <p>静的サイト版を改造して、<strong>異なる端末(PC・スマホ・タブレット)で同じvault</strong>を使えるようにした版です。完全無料の範囲で動くように作ってあります。</p>
+    <ul class="plain">
+      <li>フロント(ランチャー・shim)と、KVを読み書きするAPI(<code>_worker.js</code>)を <strong>Cloudflare Pages</strong> で動かします。</li>
+      <li>vaultの中身は <strong>Workers KV</strong> に保存します。</li>
+      <li>入るにはパスワードが必要です(パスワードはPagesのSecretに置きます)。</li>
+      <li>Obsidian本体(<code>obsidian.asar</code> / モバイル版 <code>public</code> のzip)は、静的サイト版と同じく<strong>各端末で読み込む</strong>方式です(サイトには置きません)。</li>
+    </ul>
+    <p>アップロードするのは、リポジトリの <code>obsidian-web-kv-pages/obsidian-web-kv-pages.zip</code> です。zipの直下に <code>_worker.js</code> などが並んでいます。</p>
+
+    <h3>セットアップ(10分ほど)</h3>
+    <p>メニュー名はCloudflareの画面更新で多少変わることがあります。</p>
+    <ol class="plain">
+      <li><strong>KV名前空間を作る</strong>: ダッシュボード → Workers &amp; Pages → KV → 「Create a namespace」。名前は何でもOKです(例: <code>obsidian-vault</code>)。</li>
+      <li><strong>Pagesプロジェクトを作る</strong>: Workers &amp; Pages → Create → Pages → 「Upload assets」(Direct Upload)。プロジェクト名を決めて <code>obsidian-web-kv-pages.zip</code> をアップロードし、Deployします。</li>
+      <li><strong>バインディングとパスワードを設定する</strong>: 作ったプロジェクトの Settings で、次の2つを <strong>Production</strong> に追加します。
+        <ul class="plain">
+          <li>Bindings → KV namespace → 変数名 <code>VAULT_KV</code>、1で作った名前空間を選ぶ</li>
+          <li>Variables and secrets → 種類 <strong>Secret</strong> → 名前 <code>PASSWORD</code>、値は長めのパスワード(16文字以上を推奨)</li>
+          <li>(任意)Secret <code>SESSION_SECRET</code> を足すと、ログインcookieの署名鍵に混ぜます</li>
+        </ul>
+      </li>
+      <li><strong>もう一度デプロイする</strong>: 設定は次のデプロイから反映されます。同じzipをもう一度アップロードしてください。</li>
+      <li>発行されたURL(<code>https://〇〇.pages.dev</code>)を開くと、ログイン画面が出ます。</li>
+    </ol>
+    <div class="notice" role="note">
+      <strong>うまく動かないとき</strong>
+      <code>PASSWORD (secret) is not set</code> → 手順3のSecretが未設定、または手順4の再デプロイ忘れです。<br>
+      <code>KV binding VAULT_KV is not configured</code> → バインディング名が <code>VAULT_KV</code> でない、または再デプロイ忘れです。
+    </div>
+
+    <h3>使い方</h3>
+    <p>各端末で、最初の1回だけ次を行います。</p>
+    <ol class="plain">
+      <li>URLを開いてログインします(cookieに30日間保存されます)。</li>
+      <li><strong>①</strong> Obsidian本体を読み込みます(PC: <code>obsidian.asar</code> / スマホ: APKやIPAから取り出した <code>public</code> のzip)。端末ごとに1回です。</li>
+      <li><strong>②</strong> 「クラウドvault(KV)を使う」(最初は自動で選ばれます)</li>
+      <li><strong>③</strong> 開く</li>
+    </ol>
+    <p>2回目以降は「開く」だけです。モバイル版では、②のクラウドvaultが「vaultが並ぶ親フォルダ」になり、Obsidian側で作ったvaultは全端末で共通に見えます。Obsidian画面の左下に小さく「☁」が出ます。クリックすると今すぐ同期します。別の端末へ切り替える前に「同期済み」を確認してください。</p>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>表示</th><th>意味</th></tr></thead>
+        <tbody>
+          <tr><td>☁ 同期済み</td><td>KVに保存済み</td></tr>
+          <tr><td>☁ 未保存 N</td><td>端末内に保存済み、KVへの送信待ち(Nはファイル数)</td></tr>
+          <tr><td>☁ オフライン / 同期エラー</td><td>通信できていません。変更は端末内に残り、復帰後に送られます</td></tr>
+          <tr><td>☁ 書込上限が近いため保留中</td><td>書き込み節約のため、自動送信を止めています</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <details>
+      <summary>書き込みのまとめ方(無料枠対策)</summary>
+      <p>KV無料枠は<strong>書き込み1日1,000回</strong>(UTC 0時にリセット)です。Obsidianは自動保存で頻繁に書くため、次のようにしています。</p>
+      <ul class="plain">
+        <li>保存した内容はまず端末内(IndexedDB)に残り、<strong>45秒操作が止まる</strong>か、<strong>最初の変更から3分たつ</strong>とKVへ送ります。同じファイルを何度保存しても、送るのは最後の1回分です。</li>
+        <li>作ってすぐ消したファイルや、内容が変わっていない保存は、KVに書きません。</li>
+        <li>タブを閉じる/隠すときにも送ります。送れなかった分は端末内に残っていて、次に開いたときに送ります。</li>
+        <li>この端末の本日の書き込みが<strong>400回</strong>を超えると送信間隔を5分〜15分に延ばし、<strong>900回</strong>で自動送信を止めます(☁をクリックすれば送れます)。</li>
+        <li>☁にマウスを乗せると、この端末の本日の書き込み回数が見えます(他の端末の分は含みません)。</li>
+        <li>調整したい場合は、開発者ツールで <code>localStorage</code> に秒数を入れます: <code>ow.kv.idle</code>(既定45)、<code>ow.kv.max</code>(既定180)、<code>ow.kv.limit</code>(既定900)。</li>
+        <li>一覧取得(list)にも1日1,000回の別枠があります。開いた時と、画面を触っている間の10分おきに行うだけなので、通常は足ります(30分操作がなければ自動更新を止めます)。</li>
+      </ul>
+    </details>
+
+    <details>
+      <summary>制限・注意</summary>
+      <ul class="plain">
+        <li><strong>同じノートを2台で同時に編集しないでください。</strong>後から送った方が勝ちます(自動マージはしません)。切り替えるときは「同期済み」を確認してからにしてください。</li>
+        <li>他の端末の変更が見えるまで、最大10分ほどかかります(☁クリックで即時)。KVの仕様上、反映に最大1分ほどの遅れもあります。</li>
+        <li>1ファイル25MiBまで(KVの上限)。超える添付は保存できません。</li>
+        <li>パスの長さは500バイトまで(日本語は1文字3バイトなので、約160文字)。</li>
+        <li>フォルダの移動・リネームは、中のファイル1つずつが書き込みになります。大きなフォルダを動かすと無料枠を使い切ることがあります。</li>
+        <li>全リクエストがWorkerを通るため、Workers無料枠(1日10万リクエスト)に数えられます。個人利用なら十分です。</li>
+        <li>Obsidian本体を差し替えたり、この版に更新したあとは、ランチャーで本体を<strong>読み込み直して</strong>ください。</li>
+      </ul>
+    </details>
+
+    <details>
+      <summary>セキュリティ</summary>
+      <ul class="plain">
+        <li>パスワードを知らない人には、ログイン画面以外(コードもvaultも)返しません。vaultはAPIを通してしか読み書きできません。</li>
+        <li>ログインcookieは <code>HttpOnly</code> / <code>Secure</code> / <code>SameSite=Strict</code>、署名つきで30日有効です。パスワード(Secret)を変えて再デプロイすると、全端末が自動でログアウトします。</li>
+        <li>パスワード照合は定数時間で行い、失敗すると1秒待たせます。ただし<strong>回数制限はありません</strong>。長いパスワードを使ってください。</li>
+        <li>書き込み系APIは、独自ヘッダと送信元の確認でCSRFを防いでいます。</li>
+        <li>vaultの中身は<strong>暗号化せずに</strong>KVへ保存されます(Cloudflare側の保存時暗号化のみ)。端末間の暗号化(E2E)が必要なら、別途改造が必要です。</li>
+        <li>Obsidian本体はサイトに含まれません。再配布にならないよう、zipやasarをサイトに置かないでください。</li>
+      </ul>
+    </details>
+    <p>くわしくは、リポジトリの <a href="https://github.com/nattomaki10000/obsidian-web/tree/main/obsidian-web-kv-pages">obsidian-web-kv-pages/README.md</a> を見てください。</p>
+  </section>
+
   <section id="asar">
     <h2>obsidian.asar の場所</h2>
     <p>お使いのOSに合わせて、次のパスから <code>obsidian.asar</code>(または <code>obsidian-1.xx.x.asar</code>)を取得してください。<code>[ユーザー名]</code> は自分のアカウント名に置き換えます。環境によって場所が違うことがあるので、見つからない場合は探してみてください。</p>
@@ -287,17 +388,17 @@ python -m http.server 8800      # → http://localhost:8800/</pre><button class=
       </li>
     </ul>
 
-    <p>取り出した <code>public</code> フォルダをzipにして使います。静的サイト版は <code>obsidian-mobile.zip</code> として置くか、<code>prepare.py</code> でフォルダにして <code>obsidian-mobile/</code> として置きます。サーバー版は <code>server.py</code> と同じフォルダに置きます。</p>
+    <p>取り出した <code>public</code> フォルダをzipにして使います。静的サイト版は <code>obsidian-mobile.zip</code> として置くか、<code>prepare.py</code> でフォルダにして <code>obsidian-mobile/</code> として置きます。サーバー版は <code>server.py</code> と同じフォルダに置きます。KV + Pages版は、各端末のランチャーから手動で読み込みます。</p>
   </section>
 
   <section id="limits">
     <h2>共通の制限</h2>
     <ul class="plain">
-      <li>vaultは、1サーバー(静的版は1ブラウザプロファイル)につき1つです。切り替えUIは動きません。</li>
+      <li>vaultは、1サーバー(静的版・KV版は1ブラウザプロファイル)につき1つです。切り替えUIは動きません。</li>
       <li>「既定のアプリで開く」「エクスプローラーで表示」、Webビューア、スクリーンショット系の機能は動きません。</li>
       <li>ごみ箱は <code>&lt;vault&gt;/.trash</code> になります。</li>
       <li><code>app.js</code> は配信時に1箇所だけ置換します(設定画面などを別ウィンドウにしないため)。元のasarは変更しません。</li>
-      <li>コミュニティプラグインやテーマの取得は、サーバー版ではサーバー経由、静的版ではブラウザのCORS制限を受けます。</li>
+      <li>コミュニティプラグインやテーマの取得は、サーバー版ではサーバー経由、静的版・KV版ではブラウザのCORS制限を受けます。</li>
     </ul>
   </section>
 
@@ -305,18 +406,22 @@ python -m http.server 8800      # → http://localhost:8800/</pre><button class=
     <h2>フォルダ構成</h2>
     <div class="code"><pre>.
 ├── README.md
+├── index.html               この紹介ページ
 ├── obsidian-web-dynamic/    サーバー版
 │   ├── server.py
 │   ├── web/shim.js
 │   ├── web/mobile-shim.js
 │   └── README.md
-└── obsidian-web-static/     静的サイト版
-    ├── index.html
-    ├── launcher.js
-    ├── sw.js
-    ├── app-shim.js
-    ├── mobile-shim.js
-    ├── prepare.py
+├── obsidian-web-static/     静的サイト版
+│   ├── index.html
+│   ├── launcher.js
+│   ├── sw.js
+│   ├── app-shim.js
+│   ├── mobile-shim.js
+│   ├── prepare.py
+│   └── README.md
+└── obsidian-web-kv-pages/   KV + Pages版
+    ├── obsidian-web-kv-pages.zip
     └── README.md</pre></div>
   </section>
 
