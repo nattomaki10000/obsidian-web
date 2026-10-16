@@ -76,6 +76,8 @@
   const idbSet = async (k, v) => { const db = await idb(); return new Promise((res, rej) => { const t = db.transaction('kv', 'readwrite'); t.objectStore('kv').put(v, k); t.oncomplete = () => res(); t.onerror = () => rej(t.error); }); };
 
   // Folders picked with the app's own "Open folder as vault" / "Device storage" (Android UI) live under a virtual path.
+  // Name of the one vault folder shown on this "device" (the launcher stores the picked folder's name here)
+  const VNAME = (localStorage.getItem('ow.vaultName') || 'vault').replace(/[\\/]/g, '_');
   const MOUNT = 'obsidian-web-mounts';
   let mountsP = null;
   const getMounts = () => mountsP || (mountsP = idbGet('mounts').then(m => m || {}));
@@ -87,7 +89,11 @@
       if ((await h.queryPermission({ mode: 'readwrite' })) !== 'granted') throw err('Folder permission expired. Go back to the launcher and open again.', 'EACCES');
       return { root: h, ps: ps.slice(2) };
     }
-    return { root: await getRoot(), ps };
+    // The picked folder IS the vault (same as the desktop build). The mobile UI expects a storage root that holds vaults,
+    // so the "device" shows exactly one folder, VNAME, whose contents are the picked folder.
+    if (!ps.length) return { root: null, ps, virt: true };
+    if (ps[0] !== VNAME) throw enoent(path);
+    return { root: await getRoot(), ps: ps.slice(1) };
   }
 
   let rootP = null;
@@ -113,7 +119,8 @@
     return d;
   }
   async function getEntry(path) { // -> { handle, kind, parent, name } | null
-    const { root, ps } = await locate(path);
+    const { root, ps, virt } = await locate(path);
+    if (virt) return { handle: null, kind: 'directory', parent: null, name: '', virtual: true };
     if (!ps.length) return { handle: root, kind: 'directory', parent: null, name: '' };
     const name = ps.pop();
     let parent;
@@ -198,7 +205,8 @@
           else { children.push({ name: rel, type: 'directory', size: 0, ctime: 0, mtime: 0 }); await walk(h, rel); }
         }
       };
-      await walk(e.handle, '');
+      if (e.virtual) { children.push({ name: VNAME, type: 'directory', size: 0, ctime: 0, mtime: 0 }); await walk(await getRoot(), VNAME); }
+      else await walk(e.handle, '');
       return { children };
     },
     async readFile({ path, encoding }) {
@@ -220,7 +228,7 @@
       if (e.kind !== 'file') throw err('Path is a directory: ' + path, 'EISDIR');
       await e.parent.removeEntry(e.name);
     },
-    async mkdir({ path }) { const { root, ps } = await locate(path); await getDir(ps, true, root); },
+    async mkdir({ path }) { const { root, ps, virt } = await locate(path); if (virt) return; await getDir(ps, true, root); },
     async rmdir({ path, recursive }) {
       const e = await need(path);
       if (!e.parent) throw err('Cannot remove the root', 'EPERM');
@@ -230,6 +238,7 @@
       const e = await need(path);
       if (e.kind !== 'directory') throw err('Not a directory: ' + path, 'ENOTDIR');
       const base = parts(path).join('/'), files = [];
+      if (e.virtual) return { files: [{ name: VNAME, type: 'directory', size: 0, ctime: 0, mtime: 0, uri: uriOf(VNAME) }] };
       for await (const [name, h] of e.handle.entries()) {
         if (h.kind === 'file') {
           const f = await h.getFile();
@@ -380,5 +389,13 @@
   }
 
   // ------------------------------------------------------------------ the mobile UI is built for a touch screen and a phone-sized viewport
+  // The picked folder is the only vault: open it straight away. Re-point when the picked folder changed or an older
+  // layout (vault = subfolder inside the picked folder) was remembered.
+  try {
+    if (localStorage.getItem('owm-autoopened') !== VNAME) {
+      localStorage.setItem('owm-autoopened', VNAME);
+      localStorage.setItem('mobile-selected-vault', PLATFORM === 'ios' ? 'documents/' + VNAME : VNAME);
+    }
+  } catch (_) { /* ignore */ }
   document.documentElement.classList.add('owm');
 })();

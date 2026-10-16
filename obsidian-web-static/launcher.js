@@ -233,7 +233,7 @@
     vaultRec = await idbGet('vault');
     if (vaultRec) {
       const name = vaultRec.kind === 'opfs' ? (meta && meta.mobile ? 'ブラウザ内ストレージ' : OPFS_NAME + '(ブラウザ内)') : vaultRec.handle.name;
-      setState('vaultState', '選択中: ' + name + (meta && meta.mobile ? '(この中にvaultが並びます)' : ''), 'ok');
+      setState('vaultState', '選択中: ' + name + (meta && meta.mobile ? '(このフォルダがそのままvaultになります)' : ''), 'ok');
     } else setState('vaultState', '未選択');
     $('open').disabled = !(meta && vaultRec);
     $('open').textContent = !vaultRec ? 'Obsidianを開く' : meta && meta.mobile ? 'モバイル版Obsidianを開く' : '「' + (vaultRec.kind === 'opfs' ? OPFS_NAME : vaultRec.handle.name) + '」をObsidianで開く';
